@@ -158,6 +158,19 @@ publishing {
             artifactId = mod_id
             version = mod_version
             from components.java
+
+            // The `minecraft` configuration's own dependency (net.minecraftforge:forge) leaks into
+            // runtimeElements as "net.minecraftforge:forge:1.20.1-47.4.10_mapped_official_1.20.1" -
+            // FG's own internal coordinate for the locally-patched dev jar, not a real artifact
+            // published anywhere. A consumer resolving this normally just fails to find it; a
+            // consumer using fg.deobf(...) (required for this branch - see the wiki) reads straight
+            // into THIS dependency to figure out what to deobfuscate against and chokes on it
+            // outright. Consumers already have their own Forge dependency; PonderLib's own is
+            // compile-time infrastructure, never something worth publishing as transitive.
+            pom.withXml {
+                asNode().dependencies.dependency.findAll { it.groupId.text() == 'net.minecraftforge' }
+                    .each { it.parent().remove(it) }
+            }
         }
     }
     repositories {
@@ -166,4 +179,11 @@ publishing {
             url = layout.buildDirectory.dir('repo')
         }
     }
+}
+
+// Same net.minecraftforge:forge leak as above, but in the Gradle Module Metadata file (which
+// Gradle prefers over the POM whenever both are present) - simplest to just not publish that file
+// at all, since a plain POM is all a JAR-via-JitPack consumer needs anyway.
+tasks.withType(GenerateModuleMetadata).configureEach {
+    enabled = false
 }
