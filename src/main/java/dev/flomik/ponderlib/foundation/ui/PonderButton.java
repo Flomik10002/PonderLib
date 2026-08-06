@@ -1,5 +1,6 @@
 package dev.flomik.ponderlib.foundation.ui;
 
+import dev.flomik.ponderlib.api.PonderUIColors;
 import dev.flomik.ponderlib.render.PonderBoxElement;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -97,14 +98,8 @@ public class PonderButton extends AbstractWidget {
         }
     }
 
-    // The same idle/hover border colour pair the scrubber frame uses.
-    private static final int BORDER_IDLE_TOP = 0x40FFEEDD;
-    private static final int BORDER_IDLE_BOT = 0x20FFEEDD;
-    private static final int BORDER_HOVER_TOP = 0x70FFFFFF;
-    private static final int BORDER_HOVER_BOT = 0x30FFFFFF;
-    private static final int BACKGROUND = 0xFF000000;
-    private static final int ICON_DIM = 0xFFAAAAAA;
-    private static final int ICON_LIT = 0xFFFFFFFF;
+    // Colours live in api.PonderUIColors so a mod can match its own palette instead of being stuck
+    // with hardcoded constants - the idle border is the same pair the scrubber frame uses.
     // A 5-tick ramp, applied per frame, same as the scrubber's fill.
     private static final float FADE_CHASE = 1F / 5;
     // The frame is drawn immediate-mode (see PonderBoxElement) at z=600, while the icon and the
@@ -165,17 +160,17 @@ public class PonderButton extends AbstractWidget {
     protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         boolean lit = isHovered() || flashing;
         new PonderBoxElement()
-            .withBackground(BACKGROUND)
+            .withBackground(PonderUIColors.buttonBackground())
             .gradientBorder(
-                lerpColor(BORDER_IDLE_TOP, BORDER_HOVER_TOP, fade),
-                lerpColor(BORDER_IDLE_BOT, BORDER_HOVER_BOT, fade))
+                lerpColor(PonderUIColors.frameBorderTop(), PonderUIColors.buttonHoverBorderTop(), fade),
+                lerpColor(PonderUIColors.frameBorderBottom(), PonderUIColors.buttonHoverBorderBottom(), fade))
             // Offset by the border inset so the frame lands exactly on the widget's own clickable
             // 20x20 box: PonderBoxElement inflates by borderOffset + 1 = 3 on every side.
             .at(getX() + 3, getY() + 3, FRAME_Z)
             .withBounds(SIZE - 6, SIZE - 6)
             .render(graphics);
 
-        drawIcon(graphics, lit ? ICON_LIT : ICON_DIM);
+        drawIcon(graphics, lit ? PonderUIColors.buttonIconLit() : PonderUIColors.buttonIconDim());
 
         if (shortcut != null && fade > 0.1F) {
             // The key name is drawn under the icon, faded in with the button. drawString has no z
