@@ -1,7 +1,7 @@
 # PonderLib
 
-An in-game documentation/tutorial system for NeoForge 1.21.1 mods, packaged as a standalone public
-API with no dependency on Create, Flywheel or Catnip.
+An in-game documentation/tutorial system for NeoForge 1.21.1 mods, distributed as a standalone
+public API with no external mod dependencies.
 
 Any mod can register scenes for its own blocks and items: static geometry comes from a vanilla
 structure `.nbt` schematic, behaviour from a storyboard written in code.
