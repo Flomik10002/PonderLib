@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
 import dev.flomik.ponderlib.Config;
 import dev.flomik.ponderlib.api.PonderSceneColors;
+import dev.flomik.ponderlib.api.PonderUIColors;
 import dev.flomik.ponderlib.api.element.PonderElement;
 import dev.flomik.ponderlib.api.element.PonderOverlayElement;
 import dev.flomik.ponderlib.api.element.PonderSceneElement;
@@ -96,15 +97,8 @@ public class PonderUI extends Screen {
     // 3..4), offset by (-2,-2) from the frame's own origin.
     private static final int TIMELINE_FILL_HEIGHT = 4;
     private static final int TIMELINE_FILL_SPLIT = 3;
-    private static final int TIMELINE_FILL_TOP = 0x80AAAADD;
-    private static final int TIMELINE_FILL_BOTTOM = 0x50AAAADD;
-    // Keyframe tints are the same border colour, re-alphaed (0x70 idle, 0xe0 hovered) rather than
-    // two unrelated flat whites, so a mark reads as "the same UI material, dimmer or brighter."
-    private static final int TIMELINE_BORDER_TOP = 0x40FFEEDD;
-    private static final int TIMELINE_BORDER_BOT = 0x20FFEEDD;
-    private static final int KEYFRAME_TINT = 0xFFFFFF;
-    private static final int KEYFRAME_ALPHA_IDLE = 0x70;
-    private static final int KEYFRAME_ALPHA_HOVER = 0xE0;
+    // Fill/border/keyframe colours live in api.PonderUIColors so a mod can match its own palette
+    // instead of being stuck with hardcoded constants.
     private static final int KEYFRAME_HEIGHT_IDLE = 4;
     private static final int KEYFRAME_HEIGHT_HOVER = 8;
     // Exponential chase factor for the bar fill - see #chaseTimelineProgress.
@@ -527,7 +521,7 @@ public class PonderUI extends Screen {
 
         new PonderBoxElement()
             .withBackground(0xFF000000)
-            .gradientBorder(TIMELINE_BORDER_TOP, TIMELINE_BORDER_BOT)
+            .gradientBorder(PonderUIColors.frameBorderTop(), PonderUIColors.frameBorderBottom())
             .at(boxLeft, boxTop, 400)
             .withBounds(boxWidth, boxHeight)
             .withAlpha(value)
@@ -605,7 +599,7 @@ public class PonderUI extends Screen {
 
         new PonderBoxElement()
             .withBackground(0xFF000000)
-            .gradientBorder(TIMELINE_BORDER_TOP, TIMELINE_BORDER_BOT)
+            .gradientBorder(PonderUIColors.frameBorderTop(), PonderUIColors.frameBorderBottom())
             .at(barX, barY, 400)
             .withBounds(barWidth, 1)
             .render(graphics);
@@ -622,8 +616,8 @@ public class PonderUI extends Screen {
         // FILL_Z/MARK_Z (310/320) land at 410/420 absolute inside this translate(..., 100) frame,
         // in front of the 400 frame.
         int filled = Math.round((barWidth + 4) * timelineProgressValue);
-        graphics.fill(0, 1, filled, TIMELINE_FILL_SPLIT, FILL_Z, TIMELINE_FILL_TOP);
-        graphics.fill(0, TIMELINE_FILL_SPLIT, filled, TIMELINE_FILL_HEIGHT, FILL_Z, TIMELINE_FILL_BOTTOM);
+        graphics.fill(0, 1, filled, TIMELINE_FILL_SPLIT, FILL_Z, PonderUIColors.timelineFillTop());
+        graphics.fill(0, TIMELINE_FILL_SPLIT, filled, TIMELINE_FILL_HEIGHT, FILL_Z, PonderUIColors.timelineFillBottom());
 
         // -2: no valid hover index (nothing to ever equal) - the sentinel for "cursor isn't over the
         // bar at all" (also covers "no keyframes at all", since hoveredKeyframeIndex assumes at
@@ -717,9 +711,9 @@ public class PonderUI extends Screen {
      * glyph appear below it showing whether seeking there means going back or forward.
      */
     private void drawKeyframeMark(GuiGraphics graphics, int x, int keyframeTime, boolean hovered) {
-        int alpha = hovered ? KEYFRAME_ALPHA_HOVER : KEYFRAME_ALPHA_IDLE;
+        int alpha = hovered ? PonderUIColors.keyframeAlphaHover() : PonderUIColors.keyframeAlphaIdle();
         int markHeight = hovered ? KEYFRAME_HEIGHT_HOVER : KEYFRAME_HEIGHT_IDLE;
-        int color = (alpha << 24) | KEYFRAME_TINT;
+        int color = (alpha << 24) | PonderUIColors.keyframeTint();
 
         graphics.fill(x, 0, x + 2, 1 + markHeight, MARK_Z, color);
 
