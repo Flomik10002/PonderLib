@@ -136,7 +136,33 @@ public class PonderSceneBuilder implements SceneBuilder {
 
     @Override
     public void showBasePlate() {
-        world().showSection(basePlateSelection(), Direction.UP);
+        createSection(basePlateSelection(), Direction.UP, true);
+    }
+
+    /**
+     * Shared by {@link WorldInstructionsImpl#showSection} and {@link #showBasePlate}, which needs
+     * to mark its own section as the base plate (see {@link WorldSectionElementImpl#setBasePlate})
+     * before it's ever added to the scene - something the public {@link WorldInstructions#showSection}
+     * signature has no way to express.
+     */
+    private ElementLink<WorldSectionElement> createSection(Selection selection, Direction direction, boolean basePlate) {
+        WorldSectionElementImpl element = new WorldSectionElementImpl(selection);
+        element.setBasePlate(basePlate);
+        ElementLink<WorldSectionElement> link = new SimpleElementLink<>(WorldSectionElement.class);
+
+        double minX = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE;
+        double minZ = Double.MAX_VALUE;
+        double maxZ = -Double.MAX_VALUE;
+        for (BlockPos pos : selection) {
+            minX = Math.min(minX, pos.getX());
+            maxX = Math.max(maxX, pos.getX() + 1);
+            minZ = Math.min(minZ, pos.getZ());
+            maxZ = Math.max(maxZ, pos.getZ() + 1);
+        }
+        addInstruction(new RevealSectionInstruction(element, link, direction, SECTION_FADE_TICKS,
+            selection.getCenter(), minX, maxX, minZ, maxZ));
+        return link;
     }
 
     // Package-private (not private) so PonderSceneBuilderTest can verify the cuboid math directly,
@@ -196,22 +222,7 @@ public class PonderSceneBuilder implements SceneBuilder {
 
         @Override
         public ElementLink<WorldSectionElement> showSection(Selection selection, Direction direction) {
-            WorldSectionElementImpl element = new WorldSectionElementImpl(selection);
-            ElementLink<WorldSectionElement> link = new SimpleElementLink<>(WorldSectionElement.class);
-
-            double minX = Double.MAX_VALUE;
-            double maxX = -Double.MAX_VALUE;
-            double minZ = Double.MAX_VALUE;
-            double maxZ = -Double.MAX_VALUE;
-            for (BlockPos pos : selection) {
-                minX = Math.min(minX, pos.getX());
-                maxX = Math.max(maxX, pos.getX() + 1);
-                minZ = Math.min(minZ, pos.getZ());
-                maxZ = Math.max(maxZ, pos.getZ() + 1);
-            }
-            addInstruction(new RevealSectionInstruction(element, link, direction, SECTION_FADE_TICKS,
-                selection.getCenter(), minX, maxX, minZ, maxZ));
-            return link;
+            return createSection(selection, direction, false);
         }
 
         @Override
