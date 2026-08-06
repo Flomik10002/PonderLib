@@ -50,6 +50,7 @@ public class WorldSectionElementImpl implements WorldSectionElement {
     private final Map<BlockPos, BlockEntity> blockEntities = new LinkedHashMap<>();
     private final Map<BlockState, List<SceneRenderBuffer>> bakedByState = new LinkedHashMap<>();
     private boolean visible;
+    private boolean basePlate;
 
     private Vec3 animatedRotation = Vec3.ZERO;
     private Vec3 animatedOffset = Vec3.ZERO;
@@ -119,6 +120,20 @@ public class WorldSectionElementImpl implements WorldSectionElement {
     @Override
     public boolean isVisible() {
         return visible;
+    }
+
+    /**
+     * Marks this section as the scene's base plate - set only by {@code
+     * PonderSceneBuilder#showBasePlate}. {@code foundation.ui.PonderUI}'s identify-mode hover
+     * picking skips base plate sections entirely: the floor is scenery, not something a scene is
+     * ever actually about, so it shouldn't outline or tooltip like a real subject block would.
+     */
+    public void setBasePlate(boolean basePlate) {
+        this.basePlate = basePlate;
+    }
+
+    public boolean isBasePlate() {
+        return basePlate;
     }
 
     @Override

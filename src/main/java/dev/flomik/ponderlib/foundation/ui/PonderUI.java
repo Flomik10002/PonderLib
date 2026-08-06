@@ -965,6 +965,11 @@ public class PonderUI extends Screen {
      * this matches the same ordering {@code RenderSystem.enableDepthTest()} enforces when the scene
      * itself is drawn (see {@link #renderScene}), but is not the intuitive "smaller wins" one might
      * assume from screen-space distance alone.
+     * <p>
+     * Skips every {@link WorldSectionElementImpl#isBasePlate()} section entirely - the floor is
+     * scenery, not a subject, so hovering it falls through to whatever's behind it, or to the plain
+     * "hold [key] to identify" hint if nothing else is under the cursor, exactly as if nothing were
+     * being hovered at all.
      */
     private void renderIdentifyHover(GuiGraphics graphics, int mouseX, int mouseY) {
         if (mouseY > height - 80) {
@@ -988,7 +993,7 @@ public class PonderUI extends Screen {
         float bestDepth = Float.NEGATIVE_INFINITY;
 
         for (PonderElement element : scene().getElements()) {
-            if (!(element instanceof WorldSectionElementImpl section) || !element.isVisible()) {
+            if (!(element instanceof WorldSectionElementImpl section) || !element.isVisible() || section.isBasePlate()) {
                 continue;
             }
             Matrix4f blockBase = new Matrix4f(camera).mul(section.getSectionTransform());
