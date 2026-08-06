@@ -6,6 +6,8 @@ public API with no external mod dependencies.
 Any mod can register scenes for its own blocks and items: static geometry comes from a vanilla
 structure `.nbt` schematic, behaviour from a storyboard written in code.
 
+Docs, API walkthrough, and setup: **[the wiki](https://github.com/Flomik10002/PonderLib/wiki)**.
+
 ## Licensing
 
 Copyright (c) 2026 Flomik
