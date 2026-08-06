@@ -3,11 +3,12 @@ package dev.flomik.ponderlib;
 import com.mojang.logging.LogUtils;
 import dev.flomik.ponderlib.datagen.PonderLangProvider;
 import dev.flomik.ponderlib.datagen.PonderTestStructureProvider;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
-import net.neoforged.neoforge.data.event.GatherDataEvent;
+import net.minecraftforge.data.event.GatherDataEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
 @Mod(Ponderlib.MODID)
@@ -16,10 +17,11 @@ public class Ponderlib {
     public static final String MODID = "ponderlib";
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public Ponderlib(IEventBus modEventBus, ModContainer modContainer) {
+    public Ponderlib() {
         LOGGER.info("PonderLib initializing");
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         modEventBus.addListener(this::gatherData);
-        modContainer.registerConfig(ModConfig.Type.CLIENT, Config.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, Config.SPEC);
     }
 
     private void gatherData(GatherDataEvent event) {

@@ -1,6 +1,6 @@
 modLoader = "javafml" #mandatory
-# The loader version doesn't matter much for a single mod - modify the NeoForge/Minecraft version ranges below instead.
-loaderVersion = "[0,)" #mandatory
+# The loader version doesn't matter much for a single mod - modify the Forge/Minecraft version ranges below instead.
+loaderVersion = "[47,)" #mandatory
 license = "${mod_license}"
 
 [[mods]] #mandatory
@@ -12,15 +12,15 @@ description = '''${mod_description}''' #mandatory
 logoFile = "icon.png" #optional
 
 [[dependencies."${mod_id}"]]
-modId = "neoforge"
-type = "required"
-versionRange = "[${neo_version},)"
+modId = "forge"
+mandatory = true
+versionRange = "[${forge_version},)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "minecraft"
-type = "required"
+mandatory = true
 versionRange = "[${minecraft_version}]"
 ordering = "NONE"
 side = "BOTH"

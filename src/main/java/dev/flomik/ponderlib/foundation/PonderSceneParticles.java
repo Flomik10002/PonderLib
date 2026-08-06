@@ -2,8 +2,6 @@ package dev.flomik.ponderlib.foundation;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
 import dev.flomik.ponderlib.foundation.ui.PonderUI;
@@ -13,7 +11,6 @@ import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.particles.ParticleOptions;
-import org.joml.Matrix4fStack;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -105,11 +102,13 @@ public class PonderSceneParticles implements PonderParticleSink {
         LightTexture lightTexture = mc.gameRenderer.lightTexture();
         lightTexture.turnOnLightLayer();
         RenderSystem.enableDepthTest();
-        Matrix4fStack stack = RenderSystem.getModelViewStack();
-        stack.pushMatrix();
-        stack.mul(poseStack.last().pose());
+        PoseStack stack = RenderSystem.getModelViewStack();
+        stack.pushPose();
+        stack.mulPoseMatrix(poseStack.last().pose());
         RenderSystem.applyModelViewMatrix();
 
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder builder = tesselator.getBuilder();
         for (Map.Entry<ParticleRenderType, List<Particle>> entry : byType.entrySet()) {
             ParticleRenderType renderType = entry.getKey();
             if (renderType == ParticleRenderType.NO_RENDER) {
@@ -118,20 +117,14 @@ public class PonderSceneParticles implements PonderParticleSink {
             RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
             RenderSystem.setShader(GameRenderer::getParticleShader);
 
-            Tesselator tesselator = Tesselator.getInstance();
-            BufferBuilder bufferBuilder = renderType.begin(tesselator, mc.getTextureManager());
-            if (bufferBuilder != null) {
-                for (Particle particle : entry.getValue()) {
-                    particle.render(bufferBuilder, camera, partialTick);
-                }
-                MeshData meshData = bufferBuilder.build();
-                if (meshData != null) {
-                    BufferUploader.drawWithShader(meshData);
-                }
+            renderType.begin(builder, mc.getTextureManager());
+            for (Particle particle : entry.getValue()) {
+                particle.render(builder, camera, partialTick);
             }
+            renderType.end(tesselator);
         }
 
-        stack.popMatrix();
+        stack.popPose();
         RenderSystem.applyModelViewMatrix();
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();

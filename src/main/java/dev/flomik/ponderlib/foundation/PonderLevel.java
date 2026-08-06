@@ -9,9 +9,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.component.TypedDataComponent;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -19,7 +16,6 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.AbortableIterationConsumer;
 import net.minecraft.util.Mth;
-import net.minecraft.world.TickRateManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -27,7 +23,6 @@ import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.alchemy.PotionBrewing;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
@@ -46,7 +41,6 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.level.storage.WritableLevelData;
 import net.minecraft.world.phys.AABB;
@@ -62,6 +56,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -122,7 +117,7 @@ public class PonderLevel extends Level {
      */
     public void createBackup() {
         originalBlockEntityData.clear();
-        blockEntities.forEach((pos, blockEntity) -> originalBlockEntityData.put(pos, blockEntity.saveWithFullMetadata(registryAccess())));
+        blockEntities.forEach((pos, blockEntity) -> originalBlockEntityData.put(pos, blockEntity.saveWithFullMetadata()));
     }
 
     /**
@@ -144,7 +139,7 @@ public class PonderLevel extends Level {
             if (state == null) {
                 continue;
             }
-            BlockEntity fresh = BlockEntity.loadStatic(pos, state, entry.getValue(), registryAccess());
+            BlockEntity fresh = BlockEntity.loadStatic(pos, state, entry.getValue());
             if (fresh != null) {
                 setBlockEntityDirect(pos, fresh);
             }
@@ -244,11 +239,6 @@ public class PonderLevel extends Level {
     }
 
     @Override
-    public PotionBrewing potionBrewing() {
-        return real.potionBrewing();
-    }
-
-    @Override
     public RecipeManager getRecipeManager() {
         return real.getRecipeManager();
     }
@@ -256,11 +246,6 @@ public class PonderLevel extends Level {
     @Override
     public Scoreboard getScoreboard() {
         return real.getScoreboard();
-    }
-
-    @Override
-    public TickRateManager tickRateManager() {
-        return real.tickRateManager();
     }
 
     @Override
@@ -341,74 +326,66 @@ public class PonderLevel extends Level {
 
     @Override
     @Nullable
-    public MapItemSavedData getMapData(MapId id) {
+    public MapItemSavedData getMapData(String id) {
         return null;
     }
 
     @Override
-    public void setMapData(MapId id, MapItemSavedData data) {
+    public void setMapData(String id, MapItemSavedData data) {
     }
 
     @Override
-    public MapId getFreeMapId() {
+    public int getFreeMapId() {
         return real.getFreeMapId();
     }
 
     /**
      * Starts tracking an entity a storyboard creates (see {@code WorldInstructions#createEntity}).
      * That entity can come from any mod, including its item stack (an item frame or armor stand's
-     * displayed item), so {@link #withUnsafeComponentsDiscarded} first strips everything off that
-     * stack except the handful of components meaningful to just look at ({@code
-     * ENCHANTMENTS}/{@code POTION_CONTENTS}/{@code DAMAGE}/{@code CUSTOM_NAME}) - an arbitrary
-     * mod's item can otherwise carry a component that assumes it's attached to a real block
-     * entity/world, which a scene is not. Past that, tracking is all this needs to do - {@link
-     * #tickEntities}/{@link #renderEntities} pick the entity up from here every frame, the same way
-     * {@link #blocks} is picked up by block rendering.
+     * displayed item), so {@link #withUnsafeTagDiscarded} first strips every top-level NBT key off
+     * that stack except the small allowlist in {@link #SAFE_ITEM_TAG_KEYS} - an arbitrary mod's item
+     * can otherwise carry a tag that assumes it's attached to a real block entity/world (e.g. a
+     * shulker box's stored contents), which a scene is not. Past that, tracking is all this needs to
+     * do - {@link #tickEntities}/{@link #renderEntities} pick the entity up from here every frame,
+     * the same way {@link #blocks} is picked up by block rendering.
      */
     @Override
     public boolean addFreshEntity(Entity entity) {
         if (entity instanceof ItemFrame itemFrame) {
-            itemFrame.setItem(withUnsafeComponentsDiscarded(itemFrame.getItem()));
+            itemFrame.setItem(withUnsafeTagDiscarded(itemFrame.getItem()));
         }
         if (entity instanceof ArmorStand armorStand) {
             for (EquipmentSlot slot : EquipmentSlot.values()) {
-                armorStand.setItemSlot(slot, withUnsafeComponentsDiscarded(armorStand.getItemBySlot(slot)));
+                armorStand.setItemSlot(slot, withUnsafeTagDiscarded(armorStand.getItemBySlot(slot)));
             }
         }
         return entities.add(entity);
     }
 
     /**
-     * Strips every data component off {@code stack} except the small allowlist checked in {@link
-     * #isUnsafeItemComponent} - a no-op if the stack carries no components at all.
+     * The only top-level item NBT keys meaningful to just look at: enchantments, a potion's own
+     * effect/color, durability damage, and the custom display name/lore.
      */
-    private static ItemStack withUnsafeComponentsDiscarded(ItemStack stack) {
-        if (stack.getComponentsPatch().isEmpty()) {
+    private static final Set<String> SAFE_ITEM_TAG_KEYS = Set.of(
+        "Enchantments", "StoredEnchantments", "Potion", "CustomPotionEffects", "CustomPotionColor",
+        "Damage", "display"
+    );
+
+    /**
+     * Strips every top-level NBT key off a copy of {@code stack} except {@link #SAFE_ITEM_TAG_KEYS} -
+     * a no-op if the stack carries no tag at all.
+     */
+    private static ItemStack withUnsafeTagDiscarded(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        if (tag == null || tag.isEmpty()) {
             return stack;
         }
         ItemStack copy = stack.copy();
-        stack.getComponents().stream()
-            .filter(PonderLevel::isUnsafeItemComponent)
-            .map(TypedDataComponent::type)
-            .forEach(copy::remove);
+        CompoundTag copyTag = copy.getTag();
+        if (copyTag != null) {
+            copyTag.getAllKeys().removeIf(key -> !SAFE_ITEM_TAG_KEYS.contains(key));
+        }
         return copy;
-    }
-
-    private static boolean isUnsafeItemComponent(TypedDataComponent<?> component) {
-        return isUnsafeItemComponent(component.type());
-    }
-
-    private static boolean isUnsafeItemComponent(DataComponentType<?> component) {
-        if (component.equals(DataComponents.ENCHANTMENTS)) {
-            return false;
-        }
-        if (component.equals(DataComponents.POTION_CONTENTS)) {
-            return false;
-        }
-        if (component.equals(DataComponents.DAMAGE)) {
-            return false;
-        }
-        return !component.equals(DataComponents.CUSTOM_NAME);
     }
 
     /**
@@ -500,11 +477,11 @@ public class PonderLevel extends Level {
     }
 
     @Override
-    public void gameEvent(@Nullable Entity entity, Holder<GameEvent> event, Vec3 pos) {
+    public void gameEvent(@Nullable Entity entity, GameEvent event, Vec3 pos) {
     }
 
     @Override
-    public void gameEvent(Holder<GameEvent> event, Vec3 pos, GameEvent.Context context) {
+    public void gameEvent(GameEvent event, Vec3 pos, GameEvent.Context context) {
     }
 
     @Override
@@ -558,24 +535,6 @@ public class PonderLevel extends Level {
     @Override
     public int getSectionYFromSectionIndex(int sectionIndex) {
         return sectionIndex + this.getMinSection();
-    }
-
-    @Override
-    public void setDayTimeFraction(float fraction) {
-    }
-
-    @Override
-    public float getDayTimeFraction() {
-        return 0;
-    }
-
-    @Override
-    public float getDayTimePerTick() {
-        return 0;
-    }
-
-    @Override
-    public void setDayTimePerTick(float dayTimePerTick) {
     }
 
     private static final class DummyLevelEntityGetter<T extends EntityAccess> implements LevelEntityGetter<T> {

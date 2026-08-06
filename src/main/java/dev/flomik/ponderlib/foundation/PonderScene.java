@@ -8,7 +8,6 @@ import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 import dev.flomik.ponderlib.foundation.registration.SchematicLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -79,7 +78,6 @@ public class PonderScene {
     public static PonderScene compile(StoryBoardEntry entry) {
         PonderScene scene = new PonderScene();
         scene.component = entry.getComponent();
-        RegistryAccess registryAccess = scene.level.registryAccess();
         SchematicLoader.LoadedSchematic schematic = SchematicLoader.load(entry.getSchematicLocation());
         for (StructureTemplate.StructureBlockInfo info : schematic.blocks()) {
             scene.level.setBlockDirect(info.pos(), info.state());
@@ -87,7 +85,7 @@ public class PonderScene {
                 BlockEntity blockEntity = entityBlock.newBlockEntity(info.pos(), info.state());
                 if (blockEntity != null) {
                     if (info.nbt() != null) {
-                        blockEntity.loadWithComponents(info.nbt(), registryAccess);
+                        blockEntity.load(info.nbt());
                     }
                     scene.level.setBlockEntityDirect(info.pos(), blockEntity);
                 }

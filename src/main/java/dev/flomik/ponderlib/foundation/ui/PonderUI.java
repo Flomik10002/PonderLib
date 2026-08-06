@@ -17,6 +17,7 @@ import dev.flomik.ponderlib.foundation.PonderScene;
 import dev.flomik.ponderlib.foundation.element.TextWindowElement;
 import dev.flomik.ponderlib.foundation.element.WorldSectionElementImpl;
 import dev.flomik.ponderlib.render.PonderBoxElement;
+import dev.flomik.ponderlib.render.PonderRenderStateShards;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -73,10 +74,10 @@ public class PonderUI extends Screen {
         false,
         true,
         RenderType.CompositeState.builder()
-            .setShaderState(RenderType.POSITION_COLOR_SHADER)
-            .setTransparencyState(RenderType.TRANSLUCENT_TRANSPARENCY)
-            .setCullState(RenderType.NO_CULL)
-            .setWriteMaskState(RenderType.COLOR_WRITE)
+            .setShaderState(PonderRenderStateShards.POSITION_COLOR_SHADER)
+            .setTransparencyState(PonderRenderStateShards.TRANSLUCENT_TRANSPARENCY)
+            .setCullState(PonderRenderStateShards.NO_CULL)
+            .setWriteMaskState(PonderRenderStateShards.COLOR_WRITE)
             .createCompositeState(false)
     );
 
@@ -344,11 +345,11 @@ public class PonderUI extends Screen {
      * Scenes can also be paged with the scroll wheel, not just the buttons.
      */
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (scenes.size() > 1 && scroll(scrollY < 0)) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (scenes.size() > 1 && scroll(delta < 0)) {
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
     /**
@@ -557,7 +558,7 @@ public class PonderUI extends Screen {
         // Dims the real world behind the scene with the same gradient vanilla uses behind e.g.
         // the furnace/crafting screens - without this the scene floats over a raw, distracting
         // view of whatever the player happens to be standing in.
-        this.renderTransparentBackground(graphics);
+        this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
 
         // While lazyIndexValue hasn't caught up to index yet, the scene it's chasing AWAY from is
@@ -907,7 +908,7 @@ public class PonderUI extends Screen {
         poseStack.mulPose(Axis.XP.rotationDegrees(CAMERA_X_ROTATION));
         poseStack.mulPose(Axis.YP.rotationDegrees(CAMERA_Y_ROTATION));
         poseStack.translate(offset, 0, 0);
-        poseStack.mulPose(new Matrix4f().scaling(1, -1, 1));
+        poseStack.scale(1, -1, 1);
         poseStack.scale(30, 30, 30);
         Vec3 focus = sceneAt.getFocusPoint();
         poseStack.translate(-focus.x, -focus.y, -focus.z);
@@ -930,7 +931,7 @@ public class PonderUI extends Screen {
         applySceneTransform(poseStack, sceneAt, offset);
 
         RenderSystem.enableDepthTest();
-        RenderSystem.setupLevelDiffuseLighting(DIFFUSE_LIGHT_0, DIFFUSE_LIGHT_1);
+        RenderSystem.setupLevelDiffuseLighting(DIFFUSE_LIGHT_0, DIFFUSE_LIGHT_1, new Matrix4f());
         for (PonderElement element : sceneAt.getElements()) {
             if (element instanceof PonderSceneElement sceneElement && element.isVisible()) {
                 sceneElement.render(poseStack, graphics.bufferSource(), partialTick);
@@ -1059,9 +1060,9 @@ public class PonderUI extends Screen {
         false,
         false,
         RenderType.CompositeState.builder()
-            .setShaderState(RenderType.POSITION_COLOR_SHADER)
-            .setTransparencyState(RenderType.NO_TRANSPARENCY)
-            .setCullState(RenderType.NO_CULL)
+            .setShaderState(PonderRenderStateShards.POSITION_COLOR_SHADER)
+            .setTransparencyState(PonderRenderStateShards.NO_TRANSPARENCY)
+            .setCullState(PonderRenderStateShards.NO_CULL)
             .createCompositeState(false)
     );
 
@@ -1123,7 +1124,7 @@ public class PonderUI extends Screen {
 
     private static void outlineVertex(VertexConsumer consumer, Matrix4f pose, float x, float y, float z) {
         Vector4f pos = new Vector4f(x, y, z, 1F).mul(pose);
-        consumer.addVertex(pos.x(), pos.y(), pos.z()).setColor(255, 255, 255, 255);
+        consumer.vertex(pos.x(), pos.y(), pos.z()).color(255, 255, 255, 255).endVertex();
     }
 
     /**
@@ -1218,7 +1219,7 @@ public class PonderUI extends Screen {
                                       PerimeterSideRenderer renderer) {
         poseStack.pushPose();
         // The second flip - see renderBasePlateShadowAndFlash's javadoc. +Y is DOWN from here on.
-        poseStack.mulPose(new Matrix4f().scaling(1, -1, 1));
+        poseStack.scale(1, -1, 1);
         poseStack.translate(minX, 0, minZ);
 
         double[] spans = {maxX - minX, maxZ - minZ, maxX - minX, maxZ - minZ};
@@ -1266,8 +1267,9 @@ public class PonderUI extends Screen {
 
     private static void gradientVertex(VertexConsumer consumer, Matrix4f pose, float x, float y, int rgb, int alpha) {
         Vector4f pos = new Vector4f(x, y, 0F, 1F).mul(pose);
-        consumer.addVertex(pos.x(), pos.y(), pos.z())
-            .setColor((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, alpha);
+        consumer.vertex(pos.x(), pos.y(), pos.z())
+            .color((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, alpha)
+            .endVertex();
     }
 
     private void renderOverlay(GuiGraphics graphics, float partialTick, PonderScene sceneAt) {

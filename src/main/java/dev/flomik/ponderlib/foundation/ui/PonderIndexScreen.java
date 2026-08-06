@@ -42,7 +42,7 @@ public class PonderIndexScreen extends Screen {
 
     @Override
     protected void init() {
-        SceneList list = new SceneList(minecraft, width, height - LIST_TOP - LIST_BOTTOM_MARGIN, LIST_TOP, ENTRY_HEIGHT);
+        SceneList list = new SceneList(minecraft, width, height, LIST_TOP, height - LIST_BOTTOM_MARGIN, ENTRY_HEIGHT);
         for (StoryBoardEntry entry : PonderIndex.getScenes().getAllEntries()) {
             if (tagFilter == null || entry.getTags().contains(tagFilter)) {
                 list.addSceneEntry(entry);
@@ -75,8 +75,8 @@ public class PonderIndexScreen extends Screen {
 
     private static final class SceneList extends ObjectSelectionList<SceneList.SceneEntry> {
 
-        private SceneList(Minecraft minecraft, int width, int height, int y0, int itemHeight) {
-            super(minecraft, width, height, y0, itemHeight);
+        private SceneList(Minecraft minecraft, int width, int height, int y0, int y1, int itemHeight) {
+            super(minecraft, width, height, y0, y1, itemHeight);
         }
 
         void addSceneEntry(StoryBoardEntry entry) {

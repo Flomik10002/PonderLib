@@ -4,7 +4,6 @@ import dev.flomik.ponderlib.Ponderlib;
 import dev.flomik.ponderlib.foundation.PonderLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.gametest.framework.GameTest;
@@ -16,18 +15,18 @@ import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.FurnaceBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluids;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.minecraftforge.gametest.GameTestHolder;
+import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @GameTestHolder(Ponderlib.MODID)
 @PrefixGameTestTemplate(false)
@@ -43,9 +42,9 @@ public final class PonderLevelGameTests {
         var realBefore = helper.getLevel().getBlockState(scenePos);
 
         helper.assertTrue(ponder.setBlock(scenePos, Blocks.GOLD_BLOCK.defaultBlockState(), 3), "PonderLevel rejected a block update");
-        helper.assertValueEqual(ponder.getBlockState(scenePos).getBlock(), Blocks.GOLD_BLOCK, "Scene block was not stored");
-        helper.assertValueEqual(ponder.getBlockState(scenePos.above()).getBlock(), Blocks.AIR, "Unknown scene positions must be air");
-        helper.assertValueEqual(helper.getLevel().getBlockState(scenePos), realBefore, "Scene write leaked into the real GameTest level");
+        helper.assertTrue(Objects.equals(ponder.getBlockState(scenePos).getBlock(), Blocks.GOLD_BLOCK), "Scene block was not stored");
+        helper.assertTrue(Objects.equals(ponder.getBlockState(scenePos.above()).getBlock(), Blocks.AIR), "Unknown scene positions must be air");
+        helper.assertTrue(Objects.equals(helper.getLevel().getBlockState(scenePos), realBefore), "Scene write leaked into the real GameTest level");
         helper.succeed();
     }
 
@@ -58,8 +57,8 @@ public final class PonderLevelGameTests {
         ponder.setBlockDirect(pos, state);
         ponder.setBlockEntityDirect(pos, chest);
 
-        helper.assertValueEqual(ponder.getBlockEntity(pos), chest, "Stored block entity could not be retrieved");
-        helper.assertValueEqual(chest.getLevel(), ponder, "Block entity was not attached to the scene level");
+        helper.assertTrue(Objects.equals(ponder.getBlockEntity(pos), chest), "Stored block entity could not be retrieved");
+        helper.assertTrue(Objects.equals(chest.getLevel(), ponder), "Block entity was not attached to the scene level");
         helper.assertTrue(ponder.getBlockEntity(pos.above()) == null, "Unknown block entity position was not empty");
         helper.succeed();
     }
@@ -68,18 +67,17 @@ public final class PonderLevelGameTests {
     public static void suppliesDeterministicSceneEnvironment(GameTestHelper helper) {
         PonderLevel ponder = new PonderLevel(helper.getLevel());
 
-        helper.assertValueEqual(ponder.getFluidState(BlockPos.ZERO), Fluids.EMPTY.defaultFluidState(), "Scene fluid should default to empty");
-        helper.assertValueEqual(ponder.getMaxLocalRawBrightness(BlockPos.ZERO), 15, "Scene should be full-bright");
+        helper.assertTrue(Objects.equals(ponder.getFluidState(BlockPos.ZERO), Fluids.EMPTY.defaultFluidState()), "Scene fluid should default to empty");
+        helper.assertTrue(Objects.equals(ponder.getMaxLocalRawBrightness(BlockPos.ZERO), 15), "Scene should be full-bright");
         for (net.minecraft.world.level.LightLayer layer : net.minecraft.world.level.LightLayer.values()) {
             // Real query, not a hardcoded light value at the entity-render call site (see
             // renderEntities' javadoc) - getBrightness itself is what has to be flat, so
             // getPackedLightCoords resolves to full brightness rather than the real level's light
             // engine at whatever arbitrary coordinates a scene entity happens to occupy.
-            helper.assertValueEqual(ponder.getBrightness(layer, BlockPos.ZERO), 15,
-                "Scene brightness should be flat full-bright on layer " + layer);
+            helper.assertTrue(Objects.equals(ponder.getBrightness(layer, BlockPos.ZERO), 15), "Scene brightness should be flat full-bright on layer " + layer);
         }
         for (Direction direction : Direction.values()) {
-            helper.assertValueEqual(ponder.getShade(direction, true), 1.0F, "Scene shade should be flat");
+            helper.assertTrue(Objects.equals(ponder.getShade(direction, true), 1.0F), "Scene shade should be flat");
         }
         helper.assertTrue(ponder.players().isEmpty(), "Fake scene must not expose real players");
         helper.assertTrue(!ponder.getBlockTicks().willTickThisTick(BlockPos.ZERO, Blocks.STONE), "Scene block tick queue should be empty");
@@ -110,18 +108,17 @@ public final class PonderLevelGameTests {
         ChestBlockEntity chest = new ChestBlockEntity(pos, state);
         ponder.setBlockDirect(pos, state);
         ponder.setBlockEntityDirect(pos, chest);
-        helper.assertValueEqual(chest.getOpenNess(1.0F), 0F, "Chest should start closed");
+        helper.assertTrue(Objects.equals(chest.getOpenNess(1.0F), 0F), "Chest should start closed");
 
         ponder.createBackup();
         chest.triggerEvent(1, 1);
-        helper.assertValueEqual(ponder.getBlockEntity(pos), chest, "Sanity check: still the same instance before reset");
+        helper.assertTrue(Objects.equals(ponder.getBlockEntity(pos), chest), "Sanity check: still the same instance before reset");
 
         ponder.resetBlockEntities();
         BlockEntity restored = ponder.getBlockEntity(pos);
         helper.assertTrue(restored != chest, "resetBlockEntities should replace the instance, not reuse the mutated one");
         helper.assertTrue(restored instanceof ChestBlockEntity, "Restored block entity should still be a chest");
-        helper.assertValueEqual(((ChestBlockEntity) restored).getOpenNess(1.0F), 0F,
-            "A freshly constructed chest always starts closed, regardless of what triggerEvent did to the old instance");
+        helper.assertTrue(Objects.equals(((ChestBlockEntity) restored).getOpenNess(1.0F), 0F), "A freshly constructed chest always starts closed, regardless of what triggerEvent did to the old instance");
         helper.succeed();
     }
 
@@ -149,14 +146,14 @@ public final class PonderLevelGameTests {
         for (int i = 0; i < 20; i++) {
             unlit.getBlock().animateTick(unlit, ponder, pos, RandomSource.create(i));
         }
-        helper.assertValueEqual(spawned.size(), 0, "An unlit furnace must not emit any particles");
+        helper.assertTrue(Objects.equals(spawned.size(), 0), "An unlit furnace must not emit any particles");
 
         BlockState lit = unlit.setValue(FurnaceBlock.LIT, true);
         ponder.setBlockDirect(pos, lit);
         lit.getBlock().animateTick(lit, ponder, pos, RandomSource.create(1L));
 
         // FurnaceBlock.animateTick emits exactly one SMOKE and one FLAME per call when lit.
-        helper.assertValueEqual(spawned.size(), 2, "A lit furnace should emit one smoke and one flame per animateTick");
+        helper.assertTrue(Objects.equals(spawned.size(), 2), "A lit furnace should emit one smoke and one flame per animateTick");
         helper.assertTrue(spawned.contains(ParticleTypes.SMOKE), "Lit furnace should have emitted smoke");
         helper.assertTrue(spawned.contains(ParticleTypes.FLAME), "Lit furnace should have emitted flame");
         helper.succeed();
@@ -189,7 +186,7 @@ public final class PonderLevelGameTests {
             "Scene entity must not leak into the real GameTest level");
 
         ponder.tickEntities();
-        helper.assertValueEqual(item.tickCount, 1, "tickEntities should tick every entity it tracks");
+        helper.assertTrue(Objects.equals(item.tickCount, 1), "tickEntities should tick every entity it tracks");
 
         ponder.clearEntities();
         helper.assertTrue(ponder.getSceneEntities().isEmpty(), "clearEntities should drop every tracked entity");
@@ -203,18 +200,18 @@ public final class PonderLevelGameTests {
     public static void addFreshEntityStripsUnsafeComponentsFromAnItemFramesContents(GameTestHelper helper) {
         PonderLevel ponder = new PonderLevel(helper.getLevel());
         ItemStack stack = new ItemStack(Items.DIAMOND);
-        stack.set(DataComponents.CUSTOM_NAME, Component.literal("Kept"));
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(new CompoundTag()));
+        stack.setHoverName(Component.literal("Kept"));
+        stack.getOrCreateTag().put("SomeModData", new CompoundTag());
         ItemFrame frame = new ItemFrame(ponder, BlockPos.ZERO, Direction.NORTH);
         frame.setItem(stack, false);
 
         ponder.addFreshEntity(frame);
 
         ItemStack sanitized = frame.getItem();
-        helper.assertTrue(sanitized.has(DataComponents.CUSTOM_NAME),
-            "Allowlisted component (custom name) should survive sanitizing");
-        helper.assertTrue(!sanitized.has(DataComponents.CUSTOM_DATA),
-            "Non-allowlisted component (arbitrary custom NBT) should be stripped");
+        helper.assertTrue(sanitized.hasCustomHoverName(),
+            "Allowlisted tag (display name) should survive sanitizing");
+        helper.assertTrue(sanitized.getTag() == null || !sanitized.getTag().contains("SomeModData"),
+            "Non-allowlisted tag (arbitrary custom NBT) should be stripped");
         helper.succeed();
     }
 

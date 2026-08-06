@@ -31,7 +31,7 @@ public class PonderTagIndexScreen extends Screen {
 
     @Override
     protected void init() {
-        TagList list = new TagList(minecraft, width, height - LIST_TOP - LIST_BOTTOM_MARGIN, LIST_TOP, ENTRY_HEIGHT);
+        TagList list = new TagList(minecraft, width, height, LIST_TOP, height - LIST_BOTTOM_MARGIN, ENTRY_HEIGHT);
         String currentNamespace = null;
         for (ResourceLocation tag : PonderIndex.getScenes().getAllTags()) {
             if (!tag.getNamespace().equals(currentNamespace)) {
@@ -61,8 +61,8 @@ public class PonderTagIndexScreen extends Screen {
 
     private static final class TagList extends ObjectSelectionList<TagList.TagRow> {
 
-        private TagList(Minecraft minecraft, int width, int height, int y0, int itemHeight) {
-            super(minecraft, width, height, y0, itemHeight);
+        private TagList(Minecraft minecraft, int width, int height, int y0, int y1, int itemHeight) {
+            super(minecraft, width, height, y0, y1, itemHeight);
         }
 
         void addHeaderEntry(String namespace) {

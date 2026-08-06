@@ -45,7 +45,7 @@ public final class PonderTooltipHandler {
 
     /**
      * Called once per client tick. Advances (or decays) {@link #holdKeyProgress} based on whether
-     * an {@link net.neoforged.neoforge.event.entity.player.ItemTooltipEvent} for a ponder-able item
+     * an {@link net.minecraftforge.event.entity.player.ItemTooltipEvent} for a ponder-able item
      * fired since the last tick (tracked via {@link #sawTooltipThisTick}, since tooltip events only
      * fire while a screen is actually drawing one — there's no other way to ask "is a tooltip
      * currently shown").

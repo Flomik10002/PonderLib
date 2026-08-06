@@ -2,7 +2,7 @@ package dev.flomik.ponderlib.datagen;
 
 import dev.flomik.ponderlib.Ponderlib;
 import net.minecraft.data.PackOutput;
-import net.neoforged.neoforge.common.data.LanguageProvider;
+import net.minecraftforge.common.data.LanguageProvider;
 
 /**
  * Generates {@code assets/ponderlib/lang/en_us.json} — this mod's own keybinding strings. Run via

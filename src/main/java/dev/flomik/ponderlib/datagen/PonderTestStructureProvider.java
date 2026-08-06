@@ -21,15 +21,16 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Writes a single, genuinely empty structure-template NBT (no blocks, no entities) directly under
- * {@code data/ponderlib/structure/empty.nbt} — the test suite's own {@code @GameTest(template =
- * "empty")} annotations load exactly this file. Run via {@code ./gradlew runData}.
+ * {@code data/ponderlib/structures/empty.nbt} (plural - 1.20.1's datapack convention, renamed
+ * singular only in 1.21+) — the test suite's own {@code @GameTest(template = "empty")} annotations
+ * load exactly this file. Run via {@code ./gradlew runData}.
  */
 public class PonderTestStructureProvider implements DataProvider {
 
     private final PackOutput.PathProvider pathProvider;
 
     public PonderTestStructureProvider(PackOutput output) {
-        this.pathProvider = output.createPathProvider(PackOutput.Target.DATA_PACK, "structure");
+        this.pathProvider = output.createPathProvider(PackOutput.Target.DATA_PACK, "structures");
     }
 
     @Override

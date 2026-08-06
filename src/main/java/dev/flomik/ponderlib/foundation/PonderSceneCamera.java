@@ -28,6 +28,6 @@ public class PonderSceneCamera extends Camera {
      * already runs, including a correctly billboarded particle's.
      */
     public void set(float xRotation, float yRotation) {
-        setRotation(yRotation, xRotation, 0F);
+        setRotation(yRotation, xRotation);
     }
 }

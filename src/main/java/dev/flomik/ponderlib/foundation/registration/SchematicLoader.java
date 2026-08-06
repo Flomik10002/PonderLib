@@ -5,7 +5,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
@@ -60,7 +59,7 @@ public final class SchematicLoader {
         }
 
         try (InputStream stream = resource.get().open()) {
-            CompoundTag nbt = NbtIo.readCompressed(stream, NbtAccounter.unlimitedHeap());
+            CompoundTag nbt = NbtIo.readCompressed(stream);
             StructureTemplate template = new StructureTemplate();
             template.load(BuiltInRegistries.BLOCK.asLookup(), nbt);
             return new LoadedSchematic(blocksOf(template), template.getSize());

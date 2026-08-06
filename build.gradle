@@ -2,7 +2,7 @@ plugins {
     id 'eclipse'
     id 'idea'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.141'
+    id 'net.minecraftforge.gradle' version "${forgegradle_version}"
 }
 
 group = mod_group_id
@@ -13,14 +13,14 @@ base {
 }
 
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
 }
 
 sourceSets {
     gameTest {
         java.srcDir 'src/gametest/java'
         resources.srcDir 'src/gametest/resources'
-        compileClasspath += sourceSets.main.output
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
         runtimeClasspath += output + compileClasspath
     }
 }
@@ -30,56 +30,40 @@ configurations {
     gameTestRuntimeOnly.extendsFrom runtimeOnly
 }
 
-neoForge {
-    version = neo_version
-    // `mods { sourceSet(sourceSets.gameTest) }` below only wires gameTest onto the mod's *run*
-    // classpath; this is the separate, official call that injects Minecraft/NeoForge onto an
-    // additional source set's *compile* classpath (by default only `main` gets it).
-    addModdingDependenciesTo(sourceSets.gameTest)
-
-    mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
-            sourceSet(sourceSets.gameTest)
-        }
-    }
-
-    // Runs the `test` task's JUnit tests through the same ModLauncher/FML startup as the game
-    // itself, instead of a bare JVM: gives the test source set the Minecraft/NeoForge classpath
-    // and bootstraps vanilla's static registries (Blocks, Fluids, ...), which a bare JUnit run
-    // can't do (NeoForge patches vanilla's registry bootstrap to require FML's mod loading state).
-    unitTest {
-        testedMod.set(mods.named(mod_id))
-        enable()
-    }
+minecraft {
+    mappings channel: 'official', version: minecraft_version
 
     runs {
         configureEach {
-            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            property 'forge.enabledGameTestNamespaces', mod_id
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                    source sourceSets.gameTest
+                }
+            }
         }
 
         client {
-            client()
         }
 
         server {
-            server()
-            gameDirectory = project.file('run/server')
-            programArgument '--nogui'
+            workingDirectory project.file('run/server')
+            args '--nogui'
         }
 
         gameTestServer {
-            type = 'gameTestServer'
         }
 
         data {
-            data()
-            programArguments.addAll(
-                '--mod', mod_id,
-                '--all',
-                '--output', file('src/generated/resources/').getAbsolutePath(),
-                '--existing', file('src/main/resources/').getAbsolutePath()
-            )
+            args '--mod', mod_id,
+                 '--all',
+                 '--output', file('src/generated/resources/').getAbsolutePath(),
+                 '--existing', file('src/main/resources/').getAbsolutePath()
         }
     }
 }
@@ -91,18 +75,16 @@ sourceSets.main.resources {
 
 repositories {
     // Put repositories for dependencies here
-
-    // Minecraft publishes some platform-specific libraries (including the
-    // patched macOS FreeType native) outside Maven Central.
-    maven {
-        name = 'MinecraftLibraries'
-        url = 'https://libraries.minecraft.net/'
-    }
 }
 
 dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    // compileOnly, not just runtimeOnly: VanillaBootstrapListener implements LauncherSessionListener
+    // directly, so its compile classpath needs this too, not just the test JVM's runtime classpath.
+    testCompileOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     // PonderScene has no public constructor - it's only ever built via Minecraft.getInstance().level,
     // which no automated test environment here provides (see instruction test comments). Mockito
@@ -118,13 +100,13 @@ tasks.named('test', Test).configure {
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
 tasks.named('processResources', ProcessResources).configure {
-    var replaceProperties = [minecraft_version: minecraft_version, neo_version: neo_version,
+    var replaceProperties = [minecraft_version: minecraft_version, forge_version: forge_version,
                              mod_id           : mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
                              mod_authors      : mod_authors, mod_description: mod_description,]
 
     inputs.properties replaceProperties
 
-    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
         expand replaceProperties + [project: project]
     }
 }
@@ -162,7 +144,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 // Lets a consuming mod's build.gradle depend on this jar via JitPack (implementation
-// "com.github.Flomik10002:PonderLib:v0.1.0") without hosting a Maven repo of our own - JitPack
+// "com.github.Flomik10002:PonderLib:v0.1.0-forge") without hosting a Maven repo of our own - JitPack
 // builds the tagged commit and runs publishToMavenLocal itself, so this publication only needs to
 // exist, not point anywhere reachable. The buildDir repository is for local testing of that
 // publication (./gradlew publish) without needing real repository credentials.

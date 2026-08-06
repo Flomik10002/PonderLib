@@ -1,9 +1,7 @@
 package dev.flomik.ponderlib.render;
 
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -14,7 +12,7 @@ import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.client.model.data.ModelData;
+import net.minecraftforge.client.model.data.ModelData;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -80,30 +78,28 @@ public class SceneRenderBuffer {
     private static SceneRenderBuffer bake(VirtualBlockView view, BakedModel model, BlockState state, BlockPos pos,
                                            RandomSource random, long seed, RenderType renderType) {
         Minecraft mc = Minecraft.getInstance();
-        try (ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(2048)) {
-            BufferBuilder bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-            random.setSeed(seed);
-            mc.getBlockRenderer()
-                .getModelRenderer()
-                .tesselateBlock(view, model, state, pos, new PoseStack(), bufferBuilder, false, random, seed,
-                    OverlayTexture.NO_OVERLAY, ModelData.EMPTY, renderType);
+        BufferBuilder bufferBuilder = new BufferBuilder(2048);
+        bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        random.setSeed(seed);
+        mc.getBlockRenderer()
+            .getModelRenderer()
+            .tesselateBlock(view, model, state, pos, new PoseStack(), bufferBuilder, false, random, seed,
+                OverlayTexture.NO_OVERLAY, ModelData.EMPTY, renderType);
 
-            try (MeshData mesh = bufferBuilder.build()) {
-                if (mesh == null) {
-                    return new SceneRenderBuffer(renderType, ByteBuffer.allocateDirect(0), 0);
-                }
-
-                ByteBuffer rendered = mesh.vertexBuffer();
-                rendered.order(ByteOrder.nativeOrder());
-                int vertexCount = mesh.drawState().vertexCount();
-
-                ByteBuffer copy = ByteBuffer.allocateDirect(vertexCount * VERTEX_SIZE).order(ByteOrder.nativeOrder());
-                copy.put(rendered);
-                copy.flip();
-
-                return new SceneRenderBuffer(renderType, copy, vertexCount);
-            }
+        BufferBuilder.RenderedBuffer mesh = bufferBuilder.end();
+        int vertexCount = mesh.drawState().vertexCount();
+        if (vertexCount == 0) {
+            return new SceneRenderBuffer(renderType, ByteBuffer.allocateDirect(0), 0);
         }
+
+        ByteBuffer rendered = mesh.vertexBuffer();
+        rendered.order(ByteOrder.nativeOrder());
+
+        ByteBuffer copy = ByteBuffer.allocateDirect(vertexCount * VERTEX_SIZE).order(ByteOrder.nativeOrder());
+        copy.put(rendered);
+        copy.flip();
+
+        return new SceneRenderBuffer(renderType, copy, vertexCount);
     }
 
     public RenderType getRenderType() {
@@ -162,11 +158,12 @@ public class SceneRenderBuffer {
             pos.set(x, y, z, 1F).mul(modelMatrix);
             normal.set(nx, ny, nz).mul(normalMatrix);
 
-            out.addVertex(pos.x(), pos.y(), pos.z());
-            out.setColor(r, g, b, a);
-            out.setUv(u, v);
-            out.setLight(light);
-            out.setNormal(normal.x(), normal.y(), normal.z());
+            out.vertex(pos.x(), pos.y(), pos.z());
+            out.color(r, g, b, a);
+            out.uv(u, v);
+            out.uv2(light & 0xFFFF, (light >> 16) & 0xFFFF);
+            out.normal(normal.x(), normal.y(), normal.z());
+            out.endVertex();
         }
     }
 }

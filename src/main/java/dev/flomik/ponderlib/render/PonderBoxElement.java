@@ -8,7 +8,9 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
+import org.joml.Vector4f;
 
 /**
  * The framed panel drawn behind text windows and the progress bar - the frame is most of what
@@ -93,8 +95,9 @@ public class PonderBoxElement {
         int top = scaleAlpha(borderTop, alpha);
         int bot = scaleAlpha(borderBot, alpha);
         Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder b = tesselator.getBuilder();
 
-        BufferBuilder b = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
         // Four 1px bars just outside the panel, then the panel itself (which also fills behind the
         // inner border drawn in the second batch below).
         quad(b, model, x - f - 1, y - f - 2, x + f + 1 + width, y - f - 1, bg);
@@ -102,16 +105,16 @@ public class PonderBoxElement {
         quad(b, model, x - f - 1, y + f + 1 + height, x + f + 1 + width, y + f + 2 + height, bg);
         quad(b, model, x + f + 1 + width, y - f - 1, x + f + 2 + width, y + f + 1 + height, bg);
         quad(b, model, x - f - 1, y - f - 1, x + f + 1 + width, y + f + 1 + height, bg);
-        BufferUploader.drawWithShader(b.buildOrThrow());
+        BufferUploader.drawWithShader(b.end());
 
-        b = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
         // Inner 1px border: top/bottom bars include the corners, the side bars don't - and the sides
         // carry the gradient from top colour to bottom colour.
         quad(b, model, x - f - 1, y - f - 1, x + f + 1 + width, y - f, top);
         vGradient(b, model, x - f - 1, y - f, x - f, y + f + height, top, bot);
         quad(b, model, x - f - 1, y + f + height, x + f + 1 + width, y + f + 1 + height, bot);
         vGradient(b, model, x + f + width, y - f, x + f + 1 + width, y + f + height, top, bot);
-        BufferUploader.drawWithShader(b.buildOrThrow());
+        BufferUploader.drawWithShader(b.end());
 
         RenderSystem.disableBlend();
     }
@@ -128,12 +131,14 @@ public class PonderBoxElement {
     }
 
     private void vertex(BufferBuilder b, Matrix4f model, int px, int py, int color) {
-        b.addVertex(model, px, py, z)
-            .setColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, (color >>> 24) & 0xFF);
+        Vector4f pos = new Vector4f(px, py, z, 1F).mul(model);
+        b.vertex(pos.x(), pos.y(), pos.z())
+            .color((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, (color >>> 24) & 0xFF)
+            .endVertex();
     }
 
     private static int scaleAlpha(int argb, float factor) {
-        int a = Math.round(((argb >>> 24) & 0xFF) * Math.clamp(factor, 0F, 1F));
+        int a = Math.round(((argb >>> 24) & 0xFF) * Mth.clamp(factor, 0F, 1F));
         return (a << 24) | (argb & 0xFFFFFF);
     }
 }

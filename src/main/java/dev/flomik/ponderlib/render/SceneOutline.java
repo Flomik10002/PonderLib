@@ -39,9 +39,9 @@ public final class SceneOutline {
         false,
         false,
         RenderType.CompositeState.builder()
-            .setShaderState(RenderType.POSITION_COLOR_SHADER)
-            .setTransparencyState(RenderType.NO_TRANSPARENCY)
-            .setCullState(RenderType.NO_CULL)
+            .setShaderState(PonderRenderStateShards.POSITION_COLOR_SHADER)
+            .setTransparencyState(PonderRenderStateShards.NO_TRANSPARENCY)
+            .setCullState(PonderRenderStateShards.NO_CULL)
             .createCompositeState(false)
     );
 
@@ -107,6 +107,6 @@ public final class SceneOutline {
     private static void vertex(VertexConsumer consumer, Matrix4f pose, float x, float y, float z,
                               int r, int g, int b, int a) {
         Vector4f pos = new Vector4f(x, y, z, 1F).mul(pose);
-        consumer.addVertex(pos.x(), pos.y(), pos.z()).setColor(r, g, b, a);
+        consumer.vertex(pos.x(), pos.y(), pos.z()).color(r, g, b, a).endVertex();
     }
 }
