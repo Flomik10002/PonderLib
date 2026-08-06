@@ -1,0 +1,52 @@
+package dev.flomik.ponderlib.foundation.instruction;
+
+import dev.flomik.ponderlib.foundation.PonderScene;
+
+public abstract class TickingInstruction extends PonderInstruction {
+
+    private final boolean blocking;
+    protected int totalTicks;
+    protected int remainingTicks;
+
+    protected TickingInstruction(boolean blocking, int ticks) {
+        this.blocking = blocking;
+        this.remainingTicks = this.totalTicks = ticks;
+    }
+
+    @Override
+    public void reset(PonderScene scene) {
+        super.reset(scene);
+        remainingTicks = totalTicks;
+    }
+
+    protected void firstTick(PonderScene scene) {
+    }
+
+    @Override
+    public void tick(PonderScene scene) {
+        if (remainingTicks == totalTicks) {
+            firstTick(scene);
+        }
+        if (remainingTicks > 0) {
+            remainingTicks--;
+        }
+    }
+
+    @Override
+    public boolean isComplete() {
+        return remainingTicks == 0;
+    }
+
+    @Override
+    public void onScheduled(PonderScene scene) {
+        super.onScheduled(scene);
+        if (isBlocking()) {
+            scene.addToSceneTime(totalTicks);
+        }
+    }
+
+    @Override
+    public boolean isBlocking() {
+        return blocking;
+    }
+}
