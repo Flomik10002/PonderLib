@@ -7,8 +7,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
 import dev.flomik.ponderlib.Config;
-import dev.flomik.ponderlib.api.PonderSceneColors;
-import dev.flomik.ponderlib.api.PonderUIColors;
+import dev.flomik.ponderlib.api.PonderColorScheme;
 import dev.flomik.ponderlib.api.element.PonderElement;
 import dev.flomik.ponderlib.api.element.PonderOverlayElement;
 import dev.flomik.ponderlib.api.element.PonderSceneElement;
@@ -82,8 +81,8 @@ public class PonderUI extends Screen {
     );
 
     // Warmup delay before the finishing flash pops in, 30 ticks after the scene's last counted
-    // tick (see #tickFinishingFlash). Its colours live in api.PonderSceneColors so a mod can match
-    // its own palette instead of being stuck with a hardcoded constant.
+    // tick (see #tickFinishingFlash). Its colours come from the active scene's own
+    // PonderColorScheme (see PonderScene#getColors) rather than a hardcoded constant.
     private static final int FLASH_WARMUP_TICKS = 30;
     private static final int NEXT_UP_WARMUP_TICKS = 50;
     private static final Component NEXT_UP_LABEL =
@@ -97,8 +96,8 @@ public class PonderUI extends Screen {
     // 3..4), offset by (-2,-2) from the frame's own origin.
     private static final int TIMELINE_FILL_HEIGHT = 4;
     private static final int TIMELINE_FILL_SPLIT = 3;
-    // Fill/border/keyframe colours live in api.PonderUIColors so a mod can match its own palette
-    // instead of being stuck with hardcoded constants.
+    // Fill/border/keyframe colours come from the active scene's own PonderColorScheme (see
+    // PonderScene#getColors) rather than hardcoded constants.
     private static final int KEYFRAME_HEIGHT_IDLE = 4;
     private static final int KEYFRAME_HEIGHT_HOVER = 8;
     // Exponential chase factor for the bar fill - see #chaseTimelineProgress.
@@ -254,33 +253,43 @@ public class PonderUI extends Screen {
         int bX = (width - PonderButton.SIZE) / 2 - (70 + 2 * spacing);
 
         identifyButton = addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.IDENTIFY,
-            Component.literal("Identify"), this::toggleIdentifyMode)
+            Component.literal("Identify"), this::toggleIdentifyMode, this::activeColors)
             .withShortcut(minecraft.options.keyDrop));
 
         bX += 50 + spacing;
         leftButton = addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.LEFT,
-            Component.literal("Previous scene"), () -> scroll(false))
+            Component.literal("Previous scene"), () -> scroll(false), this::activeColors)
             .withShortcut(minecraft.options.keyLeft));
 
         bX += PonderButton.SIZE + spacing;
         addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.CLOSE,
-            Component.literal("Close"), this::onClose)
+            Component.literal("Close"), this::onClose, this::activeColors)
             .withShortcut(minecraft.options.keyInventory));
 
         bX += PonderButton.SIZE + spacing;
         rightButton = addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.RIGHT,
-            Component.literal("Next scene"), () -> scroll(true))
+            Component.literal("Next scene"), () -> scroll(true), this::activeColors)
             .withShortcut(minecraft.options.keyRight));
 
         bX += 50 + spacing;
         addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.REPLAY,
-            Component.literal("Replay"), this::replay)
+            Component.literal("Replay"), this::replay, this::activeColors)
             .withShortcut(minecraft.options.keyDown));
 
         slowModeButton = addRenderableWidget(new PonderButton(width - 20 - 31, bY, PonderButton.Icon.SLOW,
-            Component.literal("Slow reading pace"), this::toggleComfyReading));
+            Component.literal("Slow reading pace"), this::toggleComfyReading, this::activeColors));
 
         updateButtonStates();
+    }
+
+    /**
+     * The currently active scene's own {@link PonderColorScheme} - buttons are built once here in
+     * {@link #init}, but read this fresh every frame (see {@code PonderButton}'s own {@code
+     * colors} supplier) since which scene is active can change afterwards (paging, the cross-fade
+     * slide).
+     */
+    private PonderColorScheme activeColors() {
+        return scene().getColors();
     }
 
     private void toggleIdentifyMode() {
@@ -521,7 +530,7 @@ public class PonderUI extends Screen {
 
         new PonderBoxElement()
             .withBackground(0xFF000000)
-            .gradientBorder(PonderUIColors.frameBorderTop(), PonderUIColors.frameBorderBottom())
+            .gradientBorder(scene().getColors().frameBorderTop(), scene().getColors().frameBorderBottom())
             .at(boxLeft, boxTop, 400)
             .withBounds(boxWidth, boxHeight)
             .withAlpha(value)
@@ -599,7 +608,7 @@ public class PonderUI extends Screen {
 
         new PonderBoxElement()
             .withBackground(0xFF000000)
-            .gradientBorder(PonderUIColors.frameBorderTop(), PonderUIColors.frameBorderBottom())
+            .gradientBorder(scene().getColors().frameBorderTop(), scene().getColors().frameBorderBottom())
             .at(barX, barY, 400)
             .withBounds(barWidth, 1)
             .render(graphics);
@@ -616,8 +625,8 @@ public class PonderUI extends Screen {
         // FILL_Z/MARK_Z (310/320) land at 410/420 absolute inside this translate(..., 100) frame,
         // in front of the 400 frame.
         int filled = Math.round((barWidth + 4) * timelineProgressValue);
-        graphics.fill(0, 1, filled, TIMELINE_FILL_SPLIT, FILL_Z, PonderUIColors.timelineFillTop());
-        graphics.fill(0, TIMELINE_FILL_SPLIT, filled, TIMELINE_FILL_HEIGHT, FILL_Z, PonderUIColors.timelineFillBottom());
+        graphics.fill(0, 1, filled, TIMELINE_FILL_SPLIT, FILL_Z, scene().getColors().timelineFillTop());
+        graphics.fill(0, TIMELINE_FILL_SPLIT, filled, TIMELINE_FILL_HEIGHT, FILL_Z, scene().getColors().timelineFillBottom());
 
         // -2: no valid hover index (nothing to ever equal) - the sentinel for "cursor isn't over the
         // bar at all" (also covers "no keyframes at all", since hoveredKeyframeIndex assumes at
@@ -711,9 +720,9 @@ public class PonderUI extends Screen {
      * glyph appear below it showing whether seeking there means going back or forward.
      */
     private void drawKeyframeMark(GuiGraphics graphics, int x, int keyframeTime, boolean hovered) {
-        int alpha = hovered ? PonderUIColors.keyframeAlphaHover() : PonderUIColors.keyframeAlphaIdle();
+        int alpha = hovered ? scene().getColors().keyframeAlphaHover() : scene().getColors().keyframeAlphaIdle();
         int markHeight = hovered ? KEYFRAME_HEIGHT_HOVER : KEYFRAME_HEIGHT_IDLE;
-        int color = (alpha << 24) | PonderUIColors.keyframeTint();
+        int color = (alpha << 24) | scene().getColors().keyframeTint();
 
         graphics.fill(x, 0, x + 2, 1 + markHeight, MARK_Z, color);
 
@@ -1167,8 +1176,8 @@ public class PonderUI extends Screen {
         // while the section it grounds is still fading in.
         int shadowAlpha = Math.round(0x66 * sectionFade(sceneAt));
 
-        int flashColor = PonderSceneColors.finishingFlash();
-        int shadowColor = PonderSceneColors.basePlateShadow();
+        int flashColor = sceneAt.getColors().finishingFlash();
+        int shadowColor = sceneAt.getColors().basePlateShadow();
         VertexConsumer consumer = buffer.getBuffer(OVERLAY_RENDER_TYPE);
 
         forEachPerimeterSide(poseStack, minX, maxX, minZ, maxZ, (pose, span) -> {

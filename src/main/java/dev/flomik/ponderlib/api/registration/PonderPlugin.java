@@ -1,5 +1,7 @@
 package dev.flomik.ponderlib.api.registration;
 
+import dev.flomik.ponderlib.api.PonderColorScheme;
+
 /**
  * The entire extension surface a third-party mod implements to add its own Ponder scenes.
  * Registered once via {@code PonderIndex.addPlugin(new MyPlugin())} from that mod's client init —
@@ -19,5 +21,15 @@ public interface PonderPlugin {
      * this mod owns here, via calls to {@code helper.addStoryBoard(...)}.
      */
     default void registerScenes(PonderSceneRegistrationHelper helper) {
+    }
+
+    /**
+     * @return the colours (base plate shadow/flash, tooltip border, timeline/button chrome) shown
+     *         while playing one of THIS plugin's own scenes. Defaults to {@link
+     *         PonderColorScheme#DEFAULT} - override only if your mod wants its own palette. This is
+     *         per-plugin, never global: it has no effect on any other mod's scenes.
+     */
+    default PonderColorScheme colors() {
+        return PonderColorScheme.DEFAULT;
     }
 }
