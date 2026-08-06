@@ -3,8 +3,9 @@ package dev.flomik.ponderlib.foundation;
 import com.google.common.base.Strings;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.flomik.ponderlib.Config;
-import dev.flomik.ponderlib.api.PonderTooltipColors;
+import dev.flomik.ponderlib.api.PonderColorScheme;
 import dev.flomik.ponderlib.api.registration.StoryBoardEntry;
+import dev.flomik.ponderlib.foundation.registration.PonderSceneRegistry;
 import dev.flomik.ponderlib.foundation.ui.PonderUI;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -16,6 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -186,9 +188,23 @@ public final class PonderTooltipHandler {
         if (!trackingStack.is(stack.getItem()) || holdKeyProgress <= 0) {
             return Optional.empty();
         }
+        ResourceLocation component = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        PonderColorScheme colors = PonderIndex.colorsFor(modIdFor(component));
         // Same *8/7 display remap as progressLine, applied before computing the border colour -
         // keeps the border's colour ramp in step with the bar instead of visibly lagging behind it.
-        return Optional.of(0xFF000000 | PonderTooltipColors.forProgress(Math.min(1, holdKeyProgress * 8 / 7F)));
+        return Optional.of(0xFF000000 | colors.tooltipBorderForProgress(Math.min(1, holdKeyProgress * 8 / 7F)));
+    }
+
+    /**
+     * The mod id owning {@code component}'s scene(s) - whichever mod's {@code PonderPlugin}
+     * registered the FIRST entry for it (see {@link PonderSceneRegistry#getScenes}'s ordering).
+     * {@code null} if nothing is registered for it at all, which {@link PonderIndex#colorsFor}
+     * treats as "use PonderLib's own defaults".
+     */
+    @Nullable
+    private static String modIdFor(ResourceLocation component) {
+        Iterator<StoryBoardEntry> entries = PonderIndex.getScenes().getScenes(component).iterator();
+        return entries.hasNext() ? entries.next().getSchematicLocation().getNamespace() : null;
     }
 
     private static Component progressLine(float progress, KeyMapping ponderKey) {

@@ -1,5 +1,6 @@
 package dev.flomik.ponderlib.foundation;
 
+import dev.flomik.ponderlib.api.PonderColorScheme;
 import dev.flomik.ponderlib.api.element.ElementLink;
 import dev.flomik.ponderlib.api.element.PonderElement;
 import dev.flomik.ponderlib.api.registration.StoryBoardEntry;
@@ -43,6 +44,9 @@ public class PonderScene {
 
     private boolean finished;
     private ResourceLocation component;
+    // null for a scene with no known registering mod (tests, the direct-PonderStoryBoard compile
+    // path below) - getColors() treats that the same as "no override", never a crash.
+    private String modId;
     private Component title = Component.empty();
     private Vec3 focusPoint = new Vec3(0.5, 0.5, 0.5);
     private double basePlateMinX = 0;
@@ -96,9 +100,10 @@ public class PonderScene {
         // toggling its own openCount) - see PonderLevel#createBackup/resetBlockEntities.
         scene.level.createBackup();
         // The schematic location is already namespaced to whichever mod registered this entry
-        // (see DefaultPonderSceneRegistrationHelper#asLocation) - reuse that instead of adding a
-        // separate modId field anywhere just for lang-key generation (see PonderSceneBuilder).
+        // (see DefaultPonderSceneRegistrationHelper#asLocation) - reuse that for both lang-key
+        // generation (see PonderSceneBuilder) and #getColors, rather than adding a second field.
         String modId = entry.getSchematicLocation().getNamespace();
+        scene.modId = modId;
         PonderSceneBuilder builder = new PonderSceneBuilder(scene, modId);
         // The schematic's own size, not a guess - see SimpleSceneBuildingUtil's javadoc for why this is
         // what makes select().layer(0)/everywhere()/column(...) work without hand-rolled loops.
@@ -121,6 +126,15 @@ public class PonderScene {
 
     public PonderLevel getLevel() {
         return level;
+    }
+
+    /**
+     * The colours this scene draws its base plate/tooltip/UI chrome with - whichever mod registered
+     * this scene's own {@code PonderPlugin#colors()}, or PonderLib's own defaults if this scene has
+     * no known owner. See {@link PonderIndex#colorsFor}.
+     */
+    public PonderColorScheme getColors() {
+        return PonderIndex.colorsFor(modId);
     }
 
     /**

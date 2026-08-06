@@ -1,11 +1,14 @@
 package dev.flomik.ponderlib.foundation;
 
+import dev.flomik.ponderlib.api.PonderColorScheme;
 import dev.flomik.ponderlib.api.registration.PonderPlugin;
 import dev.flomik.ponderlib.foundation.registration.DefaultPonderSceneRegistrationHelper;
 import dev.flomik.ponderlib.foundation.registration.PonderSceneRegistry;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Static, explicitly-called registry — no classpath scanning. A consumer mod calls
@@ -15,6 +18,11 @@ import java.util.List;
 public final class PonderIndex {
 
     private static final List<PonderPlugin> PLUGINS = new ArrayList<>();
+    // Keyed the same way a scene's own schematic location is namespaced (see
+    // DefaultPonderSceneRegistrationHelper) - lets #colorsFor go straight from "which mod owns this
+    // scene" to "that mod's own PonderPlugin#colors()" without a scene needing to keep a reference
+    // to the plugin instance itself.
+    private static final Map<String, PonderPlugin> PLUGINS_BY_MOD_ID = new HashMap<>();
     private static final PonderSceneRegistry SCENES = new PonderSceneRegistry();
     private static boolean registered;
 
@@ -23,6 +31,7 @@ public final class PonderIndex {
 
     public static void addPlugin(PonderPlugin plugin) {
         PLUGINS.add(plugin);
+        PLUGINS_BY_MOD_ID.put(plugin.getModId(), plugin);
     }
 
     public static void registerAll() {
@@ -37,5 +46,17 @@ public final class PonderIndex {
 
     public static PonderSceneRegistry getScenes() {
         return SCENES;
+    }
+
+    /**
+     * The colour scheme registered for {@code modId} (via that mod's own {@code
+     * PonderPlugin#colors()}), or {@link PonderColorScheme#DEFAULT} if {@code modId} is {@code
+     * null} or belongs to no registered plugin - a scene compiled with no known owner (tests, the
+     * direct-{@code PonderStoryBoard} path) always gets PonderLib's own base colours, never another
+     * mod's.
+     */
+    public static PonderColorScheme colorsFor(String modId) {
+        PonderPlugin plugin = modId == null ? null : PLUGINS_BY_MOD_ID.get(modId);
+        return plugin == null ? PonderColorScheme.DEFAULT : plugin.colors();
     }
 }

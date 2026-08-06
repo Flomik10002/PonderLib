@@ -1,6 +1,6 @@
 package dev.flomik.ponderlib.foundation.ui;
 
-import dev.flomik.ponderlib.api.PonderUIColors;
+import dev.flomik.ponderlib.api.PonderColorScheme;
 import dev.flomik.ponderlib.render.PonderBoxElement;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -12,6 +12,8 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Supplier;
 
 /**
  * One of the scene screen's buttons: a framed box that brightens on hover, an optional toggle
@@ -98,8 +100,8 @@ public class PonderButton extends AbstractWidget {
         }
     }
 
-    // Colours live in api.PonderUIColors so a mod can match its own palette instead of being stuck
-    // with hardcoded constants - the idle border is the same pair the scrubber frame uses.
+    // Colours come from whichever scene's own PonderColorScheme is active (see #colors) rather
+    // than hardcoded constants - the idle border is the same pair the scrubber frame uses.
     // A 5-tick ramp, applied per frame, same as the scrubber's fill.
     private static final float FADE_CHASE = 1F / 5;
     // The frame is drawn immediate-mode (see PonderBoxElement) at z=600, while the icon and the
@@ -111,15 +113,19 @@ public class PonderButton extends AbstractWidget {
 
     private final Icon icon;
     private final Runnable callback;
+    // A supplier, not a fixed value: a button is built once in PonderUI#init, but which scene (and
+    // so whose PonderColorScheme) is active can change afterwards (paging, the cross-fade slide).
+    private final Supplier<PonderColorScheme> colors;
     @Nullable
     private KeyMapping shortcut;
     private boolean flashing;
     private float fade;
 
-    public PonderButton(int x, int y, Icon icon, Component label, Runnable callback) {
+    public PonderButton(int x, int y, Icon icon, Component label, Runnable callback, Supplier<PonderColorScheme> colors) {
         super(x, y, SIZE, SIZE, label);
         this.icon = icon;
         this.callback = callback;
+        this.colors = colors;
         // Hand-drawn 8x8 icons can only carry so much meaning - a hover tooltip is what actually
         // makes each button self-describing.
         setTooltip(Tooltip.create(label));
@@ -159,18 +165,19 @@ public class PonderButton extends AbstractWidget {
     @Override
     protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         boolean lit = isHovered() || flashing;
+        PonderColorScheme scheme = colors.get();
         new PonderBoxElement()
-            .withBackground(PonderUIColors.buttonBackground())
+            .withBackground(scheme.buttonBackground())
             .gradientBorder(
-                lerpColor(PonderUIColors.frameBorderTop(), PonderUIColors.buttonHoverBorderTop(), fade),
-                lerpColor(PonderUIColors.frameBorderBottom(), PonderUIColors.buttonHoverBorderBottom(), fade))
+                lerpColor(scheme.frameBorderTop(), scheme.buttonHoverBorderTop(), fade),
+                lerpColor(scheme.frameBorderBottom(), scheme.buttonHoverBorderBottom(), fade))
             // Offset by the border inset so the frame lands exactly on the widget's own clickable
             // 20x20 box: PonderBoxElement inflates by borderOffset + 1 = 3 on every side.
             .at(getX() + 3, getY() + 3, FRAME_Z)
             .withBounds(SIZE - 6, SIZE - 6)
             .render(graphics);
 
-        drawIcon(graphics, lit ? PonderUIColors.buttonIconLit() : PonderUIColors.buttonIconDim());
+        drawIcon(graphics, lit ? scheme.buttonIconLit() : scheme.buttonIconDim());
 
         if (shortcut != null && fade > 0.1F) {
             // The key name is drawn under the icon, faded in with the button. drawString has no z
