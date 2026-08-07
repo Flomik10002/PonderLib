@@ -13,16 +13,22 @@ import dev.flomik.ponderlib.api.scene.SceneBuilder;
 import dev.flomik.ponderlib.api.scene.Selection;
 import dev.flomik.ponderlib.api.scene.TextElementBuilder;
 import dev.flomik.ponderlib.api.scene.WorldInstructions;
+import dev.flomik.ponderlib.foundation.element.BoundingBoxOutlineElement;
 import dev.flomik.ponderlib.foundation.element.EntityElementImpl;
+import dev.flomik.ponderlib.foundation.element.InputIconElement;
 import dev.flomik.ponderlib.foundation.element.InputWindowElement;
+import dev.flomik.ponderlib.foundation.element.LineElement;
 import dev.flomik.ponderlib.foundation.element.OutlineElement;
 import dev.flomik.ponderlib.foundation.element.TextWindowElement;
 import dev.flomik.ponderlib.foundation.element.WorldSectionElementImpl;
 import dev.flomik.ponderlib.foundation.instruction.AnimateElementInstruction;
+import dev.flomik.ponderlib.foundation.instruction.BoundingBoxOutlineInstruction;
 import dev.flomik.ponderlib.foundation.instruction.DelayInstruction;
 import dev.flomik.ponderlib.foundation.instruction.HideSectionInstruction;
+import dev.flomik.ponderlib.foundation.instruction.InputIconInstruction;
 import dev.flomik.ponderlib.foundation.instruction.KeyframeInstruction;
 import dev.flomik.ponderlib.foundation.instruction.InputWindowInstruction;
+import dev.flomik.ponderlib.foundation.instruction.LineInstruction;
 import dev.flomik.ponderlib.foundation.instruction.MarkAsFinishedInstruction;
 import dev.flomik.ponderlib.foundation.instruction.OutlineInstruction;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
@@ -47,6 +53,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
@@ -73,6 +80,12 @@ public class PonderSceneBuilder implements SceneBuilder {
      * signature, so this is a fixed default rather than something a storyboard can tune per call.
      */
     private static final int SECTION_FADE_TICKS = 20;
+
+    /** {@code OverlayInstructions#showLine}'s edge-box thickness, matching {@code OutlineElement}'s. */
+    private static final float LINE_THICKNESS = 0.05F;
+
+    /** {@code OverlayInstructions#showBigLine}'s edge-box thickness - visibly the "main subject" weight. */
+    private static final float BIG_LINE_THICKNESS = 0.125F;
 
     protected final PonderScene scene;
     private final WorldInstructions worldInstructions = new WorldInstructionsImpl();
@@ -632,6 +645,62 @@ public class PonderSceneBuilder implements SceneBuilder {
             OutlineElement element = new OutlineElement(selection);
             element.setPalette(palette);
             addInstruction(new OutlineInstruction(element, duration));
+        }
+
+        @Override
+        public void showOutline(PonderPalette palette, Object slot, Selection selection, int duration) {
+            showOutline(palette, selection, duration);
+        }
+
+        @Override
+        public void chaseBoundingBoxOutline(PonderPalette color, Object slot, AABB boundingBox, int duration) {
+            BoundingBoxOutlineElement element = new BoundingBoxOutlineElement(boundingBox);
+            element.setPalette(color);
+            addInstruction(new BoundingBoxOutlineInstruction(element, duration));
+        }
+
+        @Override
+        public void showLine(PonderPalette color, Vec3 start, Vec3 end, int duration) {
+            LineElement element = new LineElement(start, end, LINE_THICKNESS);
+            element.setPalette(color);
+            addInstruction(new LineInstruction(element, duration));
+        }
+
+        @Override
+        public void showBigLine(PonderPalette color, Vec3 start, Vec3 end, int duration) {
+            LineElement element = new LineElement(start, end, BIG_LINE_THICKNESS);
+            element.setPalette(color);
+            addInstruction(new LineInstruction(element, duration));
+        }
+
+        @Override
+        public void showCenteredScrollInput(BlockPos pos, Direction side, int duration) {
+            Vec3 center = new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+            Vec3 sceneSpace = center.add(Vec3.atLowerCornerOf(side.getNormal()).scale(0.5));
+            showScrollInput(sceneSpace, side, duration);
+        }
+
+        @Override
+        public void showScrollInput(Vec3 location, Direction side, int duration) {
+            InputIconElement element = new InputIconElement(location, InputIconElement.ICON_SCROLL);
+            addInstruction(new InputIconInstruction(element, duration));
+        }
+
+        @Override
+        public void showRepeaterScrollInput(BlockPos pos, int duration) {
+            showCenteredScrollInput(pos, Direction.UP, duration);
+        }
+
+        @Override
+        public void showFilterSlotInput(Vec3 location, int duration) {
+            InputIconElement element = new InputIconElement(location, InputIconElement.ICON_FILTER);
+            addInstruction(new InputIconInstruction(element, duration));
+        }
+
+        @Override
+        public void showFilterSlotInput(Vec3 location, Direction side, int duration) {
+            Vec3 offset = location.add(Vec3.atLowerCornerOf(side.getNormal()).scale(0.3));
+            showFilterSlotInput(offset, duration);
         }
 
         @Override

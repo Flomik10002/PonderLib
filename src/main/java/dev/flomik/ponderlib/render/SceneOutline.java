@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
 
@@ -81,6 +82,46 @@ public final class SceneOutline {
                 box(consumer, pose, x - t, y - t, minZ, x + t, y + t, maxZ, r, g, b, a);
             }
         }
+    }
+
+    /**
+     * Draws a thin line between two arbitrary points, transformed by {@code pose} — {@code
+     * foundation.element.LineElement}'s primitive. Whichever axis the two points actually differ
+     * along keeps its full span; the other two are treated as "constant" and inflated by {@code
+     * thickness}, the same edge-box technique {@link #render} already uses for a cube's own edges. A
+     * genuinely diagonal line (varying on more than one axis) renders as its own axis-aligned
+     * bounding box rather than a rotated thin line — a deliberate simplification, since every real
+     * caller so far draws a short, roughly axis-aligned pointer line rather than an arbitrary 3D
+     * segment.
+     *
+     * @param thickness edge box thickness, in the same units as the line's own coordinates
+     * @param argb      0xAARRGGBB
+     */
+    public static void line(VertexConsumer consumer, Matrix4f pose, Vec3 start, Vec3 end, float thickness, int argb) {
+        float t = thickness / 2F;
+        float minX = (float) Math.min(start.x, end.x);
+        float maxX = (float) Math.max(start.x, end.x);
+        float minY = (float) Math.min(start.y, end.y);
+        float maxY = (float) Math.max(start.y, end.y);
+        float minZ = (float) Math.min(start.z, end.z);
+        float maxZ = (float) Math.max(start.z, end.z);
+        if (maxX - minX < t) {
+            minX -= t;
+            maxX += t;
+        }
+        if (maxY - minY < t) {
+            minY -= t;
+            maxY += t;
+        }
+        if (maxZ - minZ < t) {
+            minZ -= t;
+            maxZ += t;
+        }
+        int a = (argb >>> 24) & 0xFF;
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >> 8) & 0xFF;
+        int b = argb & 0xFF;
+        box(consumer, pose, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, a);
     }
 
     private static void box(VertexConsumer consumer, Matrix4f pose,
