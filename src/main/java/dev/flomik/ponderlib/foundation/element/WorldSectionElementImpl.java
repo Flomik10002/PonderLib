@@ -55,6 +55,9 @@ public class WorldSectionElementImpl implements WorldSectionElement {
     private Vec3 animatedRotation = Vec3.ZERO;
     private Vec3 animatedOffset = Vec3.ZERO;
 
+    // null = rotate around the selection's own center (the default) - see #configureCenterOfRotation.
+    private Vec3 rotationCenter;
+
     // A section reveal is a light-level fade (dim to full-bright, since baked geometry can't
     // cheaply alpha-blend - see SceneRenderBuffer) plus a small slide in from fadeFromNormal, both
     // driven by fade going 0 (just revealed) to 1 (fully shown). Defaults to "already fully
@@ -161,8 +164,19 @@ public class WorldSectionElementImpl implements WorldSectionElement {
         return animatedOffset;
     }
 
+    @Override
     public void setFade(float fade) {
         this.fade = fade;
+    }
+
+    @Override
+    public void forceApplyFade(float fade) {
+        this.fade = fade;
+    }
+
+    @Override
+    public void setFadeVec(Vec3 fadeVec) {
+        this.fadeFromNormal = fadeVec;
     }
 
     public float getFade() {
@@ -170,12 +184,57 @@ public class WorldSectionElementImpl implements WorldSectionElement {
     }
 
     /**
-     * Sets the direction a reveal slides in from - a half-block offset along {@code direction}'s
-     * normal that shrinks to zero as {@link #fade} reaches 1. {@code null} disables the slide
-     * (fade-only, e.g. for a section revealed with no meaningful direction).
+     * Sets the direction a reveal/hide slides from/to - a half-block offset along {@code
+     * direction}'s normal that shrinks to zero as {@link #fade} reaches 1. {@code null} disables the
+     * slide (fade-only, e.g. for a section revealed with no meaningful direction).
      */
     public void setFadeFromDirection(Direction direction) {
-        this.fadeFromNormal = direction == null ? Vec3.ZERO : Vec3.atLowerCornerOf(direction.getNormal()).scale(0.5);
+        setFadeVec(direction == null ? Vec3.ZERO : Vec3.atLowerCornerOf(direction.getNormal()).scale(0.5));
+    }
+
+    /**
+     * Overrides the point {@link #getSectionTransform} rotates around - see {@code
+     * WorldInstructions#configureCenterOfRotation}. {@code null} (the default) falls back to the
+     * selection's own center.
+     */
+    public void setRotationCenter(Vec3 anchor) {
+        this.rotationCenter = anchor;
+    }
+
+    private Vec3 rotationCenter() {
+        return rotationCenter != null ? rotationCenter : selection.getCenter();
+    }
+
+    /**
+     * Moves {@code positions} out of this section's own tracked blocks/block-entities/baked
+     * geometry and into {@code target}'s - the "pull apart" half of {@code
+     * WorldInstructions#makeSectionIndependent}, so those positions render as part of {@code target}
+     * instead of here from this point on.
+     */
+    public void extractInto(WorldSectionElementImpl target, Set<BlockPos> positions) {
+        for (BlockPos pos : positions) {
+            BlockState state = blocks.remove(pos);
+            if (state == null) {
+                continue;
+            }
+            target.blocks.put(pos, state);
+            target.bakedByState.computeIfAbsent(state, SceneRenderBuffer::bakeAll);
+            BlockEntity blockEntity = blockEntities.remove(pos);
+            if (blockEntity != null) {
+                target.blockEntities.put(pos, blockEntity);
+            }
+        }
+    }
+
+    /**
+     * Copies every block/block-entity/baked-geometry entry from {@code other} into this section -
+     * the backing of {@code WorldInstructions#showSectionAndMerge}. {@code other} is a throwaway
+     * staging element that only ever exists to be captured once and merged here.
+     */
+    public void mergeFrom(WorldSectionElementImpl other) {
+        blocks.putAll(other.blocks);
+        blockEntities.putAll(other.blockEntities);
+        bakedByState.putAll(other.bakedByState);
     }
 
     @Override
@@ -229,7 +288,7 @@ public class WorldSectionElementImpl implements WorldSectionElement {
      * exact same per-block positions the renderer draws at.
      */
     public Matrix4f getSectionTransform() {
-        Vec3 center = selection.getCenter();
+        Vec3 center = rotationCenter();
         Vec3 fadeOffset = fadeFromNormal.scale(1 - fade);
         return new Matrix4f()
             .translate((float) (animatedOffset.x + fadeOffset.x + center.x), (float) (animatedOffset.y + fadeOffset.y + center.y), (float) (animatedOffset.z + fadeOffset.z + center.z))
