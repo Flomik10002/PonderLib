@@ -4,6 +4,7 @@ import dev.flomik.ponderlib.api.element.ElementLink;
 import dev.flomik.ponderlib.api.element.EntityElement;
 import dev.flomik.ponderlib.api.element.PonderElement;
 import dev.flomik.ponderlib.api.element.WorldSectionElement;
+import dev.flomik.ponderlib.api.ParticleEmitter;
 import dev.flomik.ponderlib.api.scene.EffectInstructions;
 import dev.flomik.ponderlib.api.PonderPalette;
 import dev.flomik.ponderlib.api.Pointing;
@@ -24,6 +25,7 @@ import dev.flomik.ponderlib.foundation.element.WorldSectionElementImpl;
 import dev.flomik.ponderlib.foundation.instruction.AnimateElementInstruction;
 import dev.flomik.ponderlib.foundation.instruction.BoundingBoxOutlineInstruction;
 import dev.flomik.ponderlib.foundation.instruction.DelayInstruction;
+import dev.flomik.ponderlib.foundation.instruction.EmitParticlesInstruction;
 import dev.flomik.ponderlib.foundation.instruction.HideSectionInstruction;
 import dev.flomik.ponderlib.foundation.instruction.InputIconInstruction;
 import dev.flomik.ponderlib.foundation.instruction.KeyframeInstruction;
@@ -40,6 +42,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -821,6 +824,11 @@ public class PonderSceneBuilder implements SceneBuilder {
 
     protected class EffectInstructionsImpl implements EffectInstructions {
 
+        // The colour real redstone dust itself glows at full power - see DustParticleOptions.
+        private static final int REDSTONE_COLOR = 0xFF0000;
+        private static final int REDSTONE_INDICATOR_COUNT = 10;
+        private static final int SUCCESS_INDICATOR_COUNT = 6;
+
         private final RandomSource random = RandomSource.create();
 
         // Goes straight through the scene's level - PonderLevel routes it into the scene's particle
@@ -839,6 +847,48 @@ public class PonderSceneBuilder implements SceneBuilder {
                     s.getLevel().addParticle(options, position.x, position.y, position.z, mx, my, mz);
                 }
             });
+        }
+
+        @Override
+        public void createRedstoneParticles(BlockPos pos, int color, int amount) {
+            emitSparks(new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5), color, amount);
+        }
+
+        @Override
+        public void indicateRedstone(BlockPos pos) {
+            createRedstoneParticles(pos, REDSTONE_COLOR, REDSTONE_INDICATOR_COUNT);
+        }
+
+        @Override
+        public void indicateSuccess(BlockPos pos) {
+            addInstruction(s -> {
+                for (int i = 0; i < SUCCESS_INDICATOR_COUNT; i++) {
+                    double x = pos.getX() + 0.5 + (random.nextDouble() - 0.5);
+                    double y = pos.getY() + 0.5 + random.nextDouble() * 0.5;
+                    double z = pos.getZ() + 0.5 + (random.nextDouble() - 0.5);
+                    s.getLevel().addParticle(ParticleTypes.HAPPY_VILLAGER, x, y, z, 0, 0.05, 0);
+                }
+            });
+        }
+
+        @Override
+        public void emitParticles(Vec3 location, ParticleEmitter emitter, float amountPerCycle, int cycles) {
+            addInstruction(new EmitParticlesInstruction(location, emitter, amountPerCycle, cycles));
+        }
+
+        @Override
+        public <T extends ParticleOptions> ParticleEmitter simpleParticleEmitter(T data, Vec3 motion) {
+            return (level, origin, rnd) -> level.addParticle(data, origin.x, origin.y, origin.z, motion.x, motion.y, motion.z);
+        }
+
+        @Override
+        public <T extends ParticleOptions> ParticleEmitter particleEmitterWithinBlockSpace(T data, Vec3 motion) {
+            return (level, origin, rnd) -> {
+                double x = origin.x + rnd.nextDouble() - 0.5;
+                double y = origin.y + rnd.nextDouble() - 0.5;
+                double z = origin.z + rnd.nextDouble() - 0.5;
+                level.addParticle(data, x, y, z, motion.x, motion.y, motion.z);
+            };
         }
     }
 }
