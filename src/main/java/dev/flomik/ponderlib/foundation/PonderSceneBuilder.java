@@ -321,8 +321,42 @@ public class PonderSceneBuilder implements SceneBuilder {
     }
 
     @Override
+    public void idleSeconds(int seconds) {
+        idle(seconds * 20);
+    }
+
+    @Override
     public void markAsFinished() {
         addInstruction(new MarkAsFinishedInstruction());
+    }
+
+    // Whole-scene configuration, same treatment as configureBasePlate above: applied directly rather
+    // than scheduled, since there's exactly one value for the scene's whole lifetime rather than a
+    // point in time it takes effect at.
+
+    @Override
+    public void scaleSceneView(float factor) {
+        scene.setSceneScale(factor);
+    }
+
+    @Override
+    public void rotateCameraY(float degrees) {
+        scene.addCameraYRotation(degrees);
+    }
+
+    @Override
+    public void removeShadow() {
+        scene.setShadowEnabled(false);
+    }
+
+    @Override
+    public void setSceneOffsetY(float yOffset) {
+        scene.setSceneOffsetY(yOffset);
+    }
+
+    @Override
+    public void setNextUpEnabled(boolean isEnabled) {
+        scene.setNextUpEnabled(isEnabled);
     }
 
     protected class WorldInstructionsImpl implements WorldInstructions {
