@@ -1,8 +1,10 @@
 package dev.flomik.ponderlib.foundation.ui;
 
+import dev.flomik.ponderlib.api.PonderColorScheme;
 import dev.flomik.ponderlib.api.registration.PonderTag;
 import dev.flomik.ponderlib.api.registration.StoryBoardEntry;
 import dev.flomik.ponderlib.foundation.PonderIndex;
+import dev.flomik.ponderlib.render.PonderBoxElement;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -17,6 +19,15 @@ import net.minecraft.world.item.ItemStack;
 import java.util.Collection;
 
 public final class PonderTagScreen extends Screen {
+
+    // Real Create frames a tag's icon in its own bordered 30x30-ish box to the LEFT of the title
+    // (foundation/ui/PonderTagScreen#renderWindow) rather than centring a big scaled-up icon behind
+    // the title text - the previous version here did the latter (icon at 3x scale, both centred on
+    // width/2), which put the icon directly on top of the title instead of beside it.
+    private static final int ICON_BOX_SIZE = 32;
+    private static final int ICON_TITLE_GAP = 8;
+    private static final int HEADER_TOP = 20;
+
     private final PonderTag tag;
     private final Screen previous;
     private ComponentList list;
@@ -42,15 +53,29 @@ public final class PonderTagScreen extends Screen {
 
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
+
+        int headerWidth = ICON_BOX_SIZE + ICON_TITLE_GAP + font.width(tag.title());
+        int headerLeft = (width - headerWidth) / 2;
+
         if (!tag.icon().isEmpty()) {
+            new PonderBoxElement()
+                .withBackground(0xD0101010)
+                .gradientBorder(PonderColorScheme.DEFAULT.frameBorderTop(), PonderColorScheme.DEFAULT.frameBorderBottom())
+                .at(headerLeft, HEADER_TOP, 0)
+                .withBounds(ICON_BOX_SIZE, ICON_BOX_SIZE)
+                .render(graphics);
+
             graphics.pose().pushPose();
-            graphics.pose().translate(width / 2F - 24, 30, 0);
-            graphics.pose().scale(3, 3, 1);
+            graphics.pose().translate(headerLeft + (ICON_BOX_SIZE - 16) / 2F, HEADER_TOP + (ICON_BOX_SIZE - 16) / 2F, 10);
             graphics.renderItem(tag.icon(), 0, 0);
             graphics.pose().popPose();
         }
-        graphics.drawCenteredString(font, tag.title(), width / 2, 51, 0xFFFFFF);
-        graphics.drawCenteredString(font, tag.description(), width / 2, 65, 0xAAAAAA);
+
+        int titleX = headerLeft + ICON_BOX_SIZE + ICON_TITLE_GAP;
+        int titleY = HEADER_TOP + (ICON_BOX_SIZE - font.lineHeight) / 2;
+        graphics.drawString(font, tag.title(), titleX, titleY, 0xFFFFFF, false);
+
+        graphics.drawCenteredString(font, tag.description(), width / 2, HEADER_TOP + ICON_BOX_SIZE + 12, 0xAAAAAA);
     }
 
     @Override public boolean isPauseScreen() { return false; }
