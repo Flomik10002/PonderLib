@@ -54,6 +54,11 @@ public class PonderScene {
     private double basePlateMinZ = 0;
     private double basePlateMaxZ = 1;
     private boolean basePlateConfigured;
+    private float sceneScale = 1F;
+    private float cameraYRotationOffset;
+    private float sceneOffsetY;
+    private boolean shadowEnabled = true;
+    private boolean nextUpEnabled = true;
     private int currentTime;
     private int totalTime;
     private boolean stoppedCounting;
@@ -410,5 +415,60 @@ public class PonderScene {
 
     public double getBasePlateMaxZ() {
         return basePlateMaxZ;
+    }
+
+    /**
+     * @see dev.flomik.ponderlib.api.scene.SceneBuilder#scaleSceneView
+     */
+    public void setSceneScale(float sceneScale) {
+        this.sceneScale = sceneScale;
+    }
+
+    public float getSceneScale() {
+        return sceneScale;
+    }
+
+    /**
+     * @see dev.flomik.ponderlib.api.scene.SceneBuilder#rotateCameraY
+     */
+    public void addCameraYRotation(float degrees) {
+        this.cameraYRotationOffset += degrees;
+    }
+
+    public float getCameraYRotationOffset() {
+        return cameraYRotationOffset;
+    }
+
+    /**
+     * @see dev.flomik.ponderlib.api.scene.SceneBuilder#setSceneOffsetY
+     */
+    public void setSceneOffsetY(float sceneOffsetY) {
+        this.sceneOffsetY = sceneOffsetY;
+    }
+
+    public float getSceneOffsetY() {
+        return sceneOffsetY;
+    }
+
+    /**
+     * @see dev.flomik.ponderlib.api.scene.SceneBuilder#removeShadow
+     */
+    public void setShadowEnabled(boolean shadowEnabled) {
+        this.shadowEnabled = shadowEnabled;
+    }
+
+    public boolean isShadowEnabled() {
+        return shadowEnabled;
+    }
+
+    /**
+     * @see dev.flomik.ponderlib.api.scene.SceneBuilder#setNextUpEnabled
+     */
+    public void setNextUpEnabled(boolean nextUpEnabled) {
+        this.nextUpEnabled = nextUpEnabled;
+    }
+
+    public boolean isNextUpEnabled() {
+        return nextUpEnabled;
     }
 }

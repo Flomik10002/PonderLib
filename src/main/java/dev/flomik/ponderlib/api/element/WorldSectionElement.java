@@ -12,7 +12,7 @@ import net.minecraft.world.phys.Vec3;
  * {@code SceneBuilder#world()#showSection}, then animate it with
  * {@code WorldInstructions#rotateSection}/{@code #moveSection}.
  */
-public interface WorldSectionElement extends PonderSceneElement {
+public interface WorldSectionElement extends AnimatedSceneElement {
 
     void setAnimatedRotation(Vec3 eulerDegrees);
 

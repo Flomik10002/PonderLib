@@ -75,7 +75,46 @@ public interface SceneBuilder {
     void idle(int ticks);
 
     /**
+     * {@link #idle(int)}, in seconds instead of ticks (20 ticks/second) — sugar for a duration that's
+     * more naturally expressed as "a couple of seconds" than a specific tick count.
+     */
+    void idleSeconds(int seconds);
+
+    /**
      * Marks the scene as finished once playback reaches this instruction.
      */
     void markAsFinished();
+
+    /**
+     * Scales the whole scene's rendered size relative to the UI around it — {@literal >}1 makes it
+     * appear larger, {@literal <}1 smaller. Useful for a schematic that reads as too small/large at
+     * this library's fixed default scale.
+     */
+    void scaleSceneView(float factor);
+
+    /**
+     * Pans this scene's camera around the vertical axis by {@code degrees}, on top of the fixed
+     * isometric angle every scene otherwise shares — for a scene whose subject reads better from a
+     * different facing than the default.
+     */
+    void rotateCameraY(float degrees);
+
+    /**
+     * Disables the ground-contact shadow skirt around this scene's base plate — for a scene that
+     * deliberately has no meaningful floor to ground it (see {@link #configureBasePlate}).
+     */
+    void removeShadow();
+
+    /**
+     * Nudges this scene's vertical position within the UI — positive moves it up, negative down. For
+     * a scene whose subject sits awkwardly high/low against the fixed default framing.
+     */
+    void setSceneOffsetY(float yOffset);
+
+    /**
+     * Controls whether the "next scene" teaser pops up once this scene finishes and another one
+     * follows it (see {@code foundation.ui.PonderUI}'s own next-up box) — {@code true} by default.
+     * Turn it off for a scene that's meant to stand alone even when it isn't the last in its group.
+     */
+    void setNextUpEnabled(boolean isEnabled);
 }
