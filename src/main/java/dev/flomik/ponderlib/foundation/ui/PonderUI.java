@@ -1033,19 +1033,19 @@ public class PonderUI extends Screen {
         renderHoveredBlockOutline(graphics, hoveredBlockBase, hoveredPos);
         BlockState state = hoveredSection.getBlockState(hoveredPos);
         ItemStack stack = new ItemStack(state.getBlock());
-        // stack.getHoverName() as a plain Component, NOT graphics.renderTooltip(font, stack, ...):
-        // that overload fires ItemTooltipEvent for the stack, which PonderTooltipHandler#addToTooltip
-        // listens to globally - hovering the very block THIS ponder is about would nest that scene's
-        // own "Hold [key] to Ponder" hint and hold-progress inside identify mode's tooltip, which
-        // makes no sense (you're already looking at its ponder) and could fire setScreen() out from
-        // under the identify-mode session it's nested in once held long enough.
+        // Render the ItemStack overload so ItemTooltipEvent fires and PonderTooltipHandler can add
+        // "Hold [key] to Ponder" for a DIFFERENT registered block inside this scene. The handler
+        // already recognizes this screen's own subject and replaces the hold prompt with the plain
+        // "Subject of this scene" hint, so rendering the real stack cannot recursively reopen the
+        // scene that is already being viewed. Base-plate blocks never reach this point because the
+        // picker skips their section above.
         if (stack.isEmpty()) {
             // No item form (e.g. fluids, some technical blocks) - fall back to its registry name
             // instead of rendering an empty/blank tooltip.
             Component fallback = Component.literal(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
             graphics.renderTooltip(font, fallback, mouseX, mouseY);
         } else {
-            graphics.renderTooltip(font, stack.getHoverName(), mouseX, mouseY);
+            graphics.renderTooltip(font, stack, mouseX, mouseY);
         }
     }
 
