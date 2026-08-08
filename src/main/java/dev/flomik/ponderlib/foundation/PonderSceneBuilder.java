@@ -434,7 +434,7 @@ public class PonderSceneBuilder implements SceneBuilder {
 
         @Override
         public void restoreBlocks(Selection selection) {
-            addInstruction(s -> s.getLevel().restoreBlocks(selection));
+            addInstruction(s -> s.restoreBlocks(selection));
         }
 
         @Override
@@ -444,9 +444,6 @@ public class PonderSceneBuilder implements SceneBuilder {
                 BlockState current = currentDisplayedState(s, immutable);
                 BlockState next = stateFunc.apply(current);
                 s.setBlockState(immutable, next);
-                for (WorldSectionElementImpl section : sectionsContaining(s, immutable)) {
-                    section.setBlockState(immutable, next);
-                }
                 if (spawnParticles) {
                     spawnBreakParticles(s, immutable, current, 10);
                 }
@@ -516,6 +513,7 @@ public class PonderSceneBuilder implements SceneBuilder {
             Set<BlockPos> positions = new HashSet<>();
             selection.forEach(positions::add);
             addInstruction(s -> {
+                extracted.clearCapturedState(s.getLevel());
                 for (PonderElement candidate : new ArrayList<>(s.getElements())) {
                     if (candidate instanceof WorldSectionElementImpl source && source != extracted) {
                         source.extractInto(extracted, positions);

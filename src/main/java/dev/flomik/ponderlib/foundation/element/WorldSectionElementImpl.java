@@ -29,6 +29,7 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,7 +89,7 @@ public class WorldSectionElementImpl implements WorldSectionElement {
      * element owns its own render/tick data and no longer depends on the level.
      */
     public void capture(PonderLevel level) {
-        this.level = level;
+        clearCapturedState(level);
         for (BlockPos pos : selection) {
             BlockPos immutable = pos.immutable();
             BlockState state = level.getBlockState(pos);
@@ -100,6 +101,14 @@ public class WorldSectionElementImpl implements WorldSectionElement {
                 blockEntities.put(immutable, blockEntity);
             }
         }
+    }
+
+    public void clearCapturedState(PonderLevel level) {
+        this.level = level;
+        blocks.clear();
+        blockEntities.clear();
+        breakingStages.clear();
+        rotationCenter = null;
     }
 
     @Override
@@ -143,10 +152,18 @@ public class WorldSectionElementImpl implements WorldSectionElement {
             return;
         }
         blocks.put(pos, state);
-        BlockEntity blockEntity = blockEntities.get(pos);
+        BlockEntity blockEntity = level == null ? blockEntities.get(pos) : level.getBlockEntity(pos);
         if (blockEntity != null) {
-            blockEntity.setBlockState(state);
+            if (blockEntity.getType().isValid(state)) {
+                blockEntity.setBlockState(state);
+                blockEntities.put(pos, blockEntity);
+            } else {
+                blockEntities.remove(pos);
+            }
+        } else {
+            blockEntities.remove(pos);
         }
+        breakingStages.remove(pos);
         // computeIfAbsent, not put - bakeAll re-tesselates and bakes a fresh GPU buffer (see
         // SceneRenderBuffer), real work worth skipping if this exact state was already baked for
         // this section before (e.g. toggling a furnace's LIT property back and forth).
@@ -245,6 +262,7 @@ public class WorldSectionElementImpl implements WorldSectionElement {
      * instead of here from this point on.
      */
     public void extractInto(WorldSectionElementImpl target, Set<BlockPos> positions) {
+        target.level = level;
         for (BlockPos pos : positions) {
             BlockState state = blocks.remove(pos);
             if (state == null) {
@@ -255,6 +273,10 @@ public class WorldSectionElementImpl implements WorldSectionElement {
             BlockEntity blockEntity = blockEntities.remove(pos);
             if (blockEntity != null) {
                 target.blockEntities.put(pos, blockEntity);
+            }
+            Integer breakingStage = breakingStages.remove(pos);
+            if (breakingStage != null) {
+                target.breakingStages.put(pos, breakingStage);
             }
         }
     }
@@ -268,17 +290,21 @@ public class WorldSectionElementImpl implements WorldSectionElement {
         blocks.putAll(other.blocks);
         blockEntities.putAll(other.blockEntities);
         bakedByState.putAll(other.bakedByState);
+        breakingStages.putAll(other.breakingStages);
     }
 
     @Override
     public void tick(PonderScene scene) {
+        if (!visible) {
+            return;
+        }
         Level level = scene.getLevel();
-        for (Map.Entry<BlockPos, BlockEntity> entry : blockEntities.entrySet()) {
-            tickBlockEntity(level, entry.getKey(), entry.getValue());
+        for (Map.Entry<BlockPos, BlockEntity> entry : new ArrayList<>(blockEntities.entrySet())) {
+            if (scene.claimBlockEntityTick(entry.getValue())) {
+                tickBlockEntity(level, entry.getKey(), entry.getValue());
+            }
         }
-        if (visible) {
-            animateBlocks(level);
-        }
+        animateBlocks(level);
     }
 
     /**
@@ -291,7 +317,7 @@ public class WorldSectionElementImpl implements WorldSectionElement {
      * overrides {@code addParticle} — see {@code PonderLevel#addParticle}/{@code PonderSceneParticles}.
      */
     private void animateBlocks(Level level) {
-        for (Map.Entry<BlockPos, BlockState> entry : blocks.entrySet()) {
+        for (Map.Entry<BlockPos, BlockState> entry : new ArrayList<>(blocks.entrySet())) {
             if (random.nextFloat() >= ANIMATE_TICK_CHANCE) {
                 continue;
             }

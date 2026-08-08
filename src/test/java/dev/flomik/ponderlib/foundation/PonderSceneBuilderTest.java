@@ -439,20 +439,18 @@ class PonderSceneBuilderTest {
     }
 
     @Test
-    void restoreBlocksDelegatesStraightToTheLevel() {
-        PonderLevel level = mock(PonderLevel.class);
-        when(scene.getLevel()).thenReturn(level);
+    void restoreBlocksDelegatesToTheSceneSoVisibleSectionsAreRefreshed() {
         Selection selection = new SimpleSelection(List.of(new BlockPos(1, 1, 1)));
 
         builder.world().restoreBlocks(selection);
         assertEquals(1, schedule.size());
         schedule.get(0).tick(scene);
 
-        verify(level).restoreBlocks(selection);
+        verify(scene).restoreBlocks(selection);
     }
 
     @Test
-    void modifyBlockUpdatesBothTheLevelAndAnyVisibleSectionAlreadyShowingThatPosition() {
+    void modifyBlockDelegatesTheStateChangeToTheScene() {
         BlockPos pos = new BlockPos(3, 0, 0);
         WorldSectionElementImpl section = mock(WorldSectionElementImpl.class);
         when(section.isVisible()).thenReturn(true);
@@ -465,7 +463,6 @@ class PonderSceneBuilderTest {
         schedule.get(0).tick(scene);
 
         verify(scene).setBlockState(pos, Blocks.STONE.defaultBlockState());
-        verify(section).setBlockState(pos, Blocks.STONE.defaultBlockState());
     }
 
     @Test

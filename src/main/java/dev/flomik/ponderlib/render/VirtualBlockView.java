@@ -42,7 +42,8 @@ public class VirtualBlockView implements BlockAndTintGetter {
 
     @Override
     public FluidState getFluidState(BlockPos pos) {
-        return net.minecraft.world.level.material.Fluids.EMPTY.defaultFluidState();
+        return pos.equals(this.pos) ? state.getFluidState()
+            : net.minecraft.world.level.material.Fluids.EMPTY.defaultFluidState();
     }
 
     @Override

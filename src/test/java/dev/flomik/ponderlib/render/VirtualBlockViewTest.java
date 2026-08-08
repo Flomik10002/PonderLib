@@ -44,4 +44,12 @@ class VirtualBlockViewTest {
 
         assertThrows(UnsupportedOperationException.class, view::getLightEngine);
     }
+
+    @Test
+    void exposesTheConfiguredBlocksFluidState() {
+        VirtualBlockView view = new VirtualBlockView(BlockPos.ZERO, Blocks.WATER.defaultBlockState());
+
+        assertEquals(Blocks.WATER.defaultBlockState().getFluidState(), view.getFluidState(BlockPos.ZERO));
+        assertEquals(Fluids.EMPTY.defaultFluidState(), view.getFluidState(BlockPos.ZERO.above()));
+    }
 }

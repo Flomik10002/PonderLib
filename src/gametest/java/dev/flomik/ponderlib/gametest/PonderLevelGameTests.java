@@ -99,11 +99,11 @@ public final class PonderLevelGameTests {
     // client-only), and PonderLevel inherits isClientSide from whatever real Level it wraps -
     // GameTest's is server-side. The fix has to work by unconditional instance replacement, not by
     // inspecting before/after state, so that's what this actually verifies: a fresh ChestBlockEntity
-    // (which is all resetBlockEntities constructs, via BlockEntity#loadStatic) always starts with
+    // (which is all resetWorld constructs, via BlockEntity#loadStatic) always starts with
     // its lid-controller state at its Java default (closed) regardless of what triggerEvent did to
     // the PREVIOUS instance - the replacement itself is what matters, not any specific NBT content.
     @GameTest(template = "empty")
-    public static void resetBlockEntitiesReplacesTheStoredInstanceWithAFreshCopy(GameTestHelper helper) {
+    public static void resetWorldReplacesTheStoredBlockEntityWithAFreshCopy(GameTestHelper helper) {
         PonderLevel ponder = new PonderLevel(helper.getLevel());
         BlockPos pos = new BlockPos(1, 2, 1);
         BlockState state = Blocks.CHEST.defaultBlockState();
@@ -116,12 +116,51 @@ public final class PonderLevelGameTests {
         chest.triggerEvent(1, 1);
         helper.assertValueEqual(ponder.getBlockEntity(pos), chest, "Sanity check: still the same instance before reset");
 
-        ponder.resetBlockEntities();
+        ponder.resetWorld();
         BlockEntity restored = ponder.getBlockEntity(pos);
-        helper.assertTrue(restored != chest, "resetBlockEntities should replace the instance, not reuse the mutated one");
+        helper.assertTrue(restored != chest, "resetWorld should replace the instance, not reuse the mutated one");
         helper.assertTrue(restored instanceof ChestBlockEntity, "Restored block entity should still be a chest");
         helper.assertValueEqual(((ChestBlockEntity) restored).getOpenNess(1.0F), 0F,
             "A freshly constructed chest always starts closed, regardless of what triggerEvent did to the old instance");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void resetWorldRestoresTheOriginalBlocksAndRemovesTransientPositions(GameTestHelper helper) {
+        PonderLevel ponder = new PonderLevel(helper.getLevel());
+        BlockPos originalPos = new BlockPos(1, 1, 1);
+        BlockPos transientPos = new BlockPos(2, 1, 1);
+        ponder.setBlockDirect(originalPos, Blocks.STONE.defaultBlockState());
+        ponder.createBackup();
+
+        ponder.setBlockDirect(originalPos, Blocks.DIRT.defaultBlockState());
+        ponder.setBlockDirect(transientPos, Blocks.STONE.defaultBlockState());
+        ponder.resetWorld();
+
+        helper.assertValueEqual(ponder.getBlockState(originalPos), Blocks.STONE.defaultBlockState(),
+            "Reset should restore the schematic block state");
+        helper.assertTrue(ponder.getBlockState(transientPos).isAir(),
+            "Reset should remove blocks created by the previous playback");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void blockStateChangesKeepBlockEntityAndFluidQueriesConsistent(GameTestHelper helper) {
+        PonderLevel ponder = new PonderLevel(helper.getLevel());
+        BlockPos pos = new BlockPos(1, 1, 1);
+        ponder.setBlockDirect(pos, Blocks.CHEST.defaultBlockState());
+        BlockEntity chest = ponder.getBlockEntity(pos);
+        helper.assertTrue(chest instanceof ChestBlockEntity,
+            "Placing an entity block should create its block entity");
+
+        ponder.setBlockDirect(pos, Blocks.AIR.defaultBlockState());
+        helper.assertTrue(ponder.getBlockEntity(pos) == null,
+            "Replacing an entity block with air should remove its stale block entity");
+        helper.assertTrue(chest.isRemoved(), "Removed block entity should be marked removed");
+
+        ponder.setBlockDirect(pos, Blocks.WATER.defaultBlockState());
+        helper.assertValueEqual(ponder.getFluidState(pos), Blocks.WATER.defaultBlockState().getFluidState(),
+            "Fluid queries should follow the stored block state");
         helper.succeed();
     }
 
