@@ -478,7 +478,7 @@ public class PonderUI extends Screen {
     private void tickNextUp() {
         nextUpPrevious = nextUpValue;
 
-        if (!scene().isFinished() || nextScene() == null) {
+        if (!scene().isFinished() || nextScene() == null || !scene().isNextUpEnabled()) {
             nextUpWarmup = 0;
             nextUpValue = 0F;
             return;
@@ -907,12 +907,13 @@ public class PonderUI extends Screen {
      * camera itself is tilted.
      */
     private void applySceneTransform(PoseStack poseStack, PonderScene sceneAt, double offset) {
-        poseStack.translate(width / 2.0, height / 2.0 - 20, 200 + offset);
+        poseStack.translate(width / 2.0, height / 2.0 - 20 - sceneAt.getSceneOffsetY(), 200 + offset);
         poseStack.mulPose(Axis.XP.rotationDegrees(CAMERA_X_ROTATION));
-        poseStack.mulPose(Axis.YP.rotationDegrees(CAMERA_Y_ROTATION));
+        poseStack.mulPose(Axis.YP.rotationDegrees(CAMERA_Y_ROTATION + sceneAt.getCameraYRotationOffset()));
         poseStack.translate(offset, 0, 0);
         poseStack.scale(1, -1, 1);
-        poseStack.scale(30, 30, 30);
+        float scale = 30 * sceneAt.getSceneScale();
+        poseStack.scale(scale, scale, scale);
         Vec3 focus = sceneAt.getFocusPoint();
         poseStack.translate(-focus.x, -focus.y, -focus.z);
     }
@@ -1193,11 +1194,13 @@ public class PonderUI extends Screen {
                 pose.popPose();
             }
 
-            pose.translate(0, 0, 2 / 1024F);
-            // Dark at the plate's edge (y=0), fading out 4 blocks below it (y=4, i.e. down).
-            gradientQuad(consumer, pose.last().pose(), -span,
-                0F, shadowColor, shadowAlpha,
-                4F, shadowColor, 0);
+            if (sceneAt.isShadowEnabled()) {
+                pose.translate(0, 0, 2 / 1024F);
+                // Dark at the plate's edge (y=0), fading out 4 blocks below it (y=4, i.e. down).
+                gradientQuad(consumer, pose.last().pose(), -span,
+                    0F, shadowColor, shadowAlpha,
+                    4F, shadowColor, 0);
+            }
         });
     }
 
