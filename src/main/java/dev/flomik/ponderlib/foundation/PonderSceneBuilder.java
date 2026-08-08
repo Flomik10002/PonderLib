@@ -563,12 +563,6 @@ public class PonderSceneBuilder implements SceneBuilder {
         }
 
         @Override
-        public void configureStabilization(ElementLink<WorldSectionElement> link, Vec3 anchor) {
-            // Accepted for signature parity - see WorldInstructions#configureStabilization's javadoc
-            // on why this library has nothing yet for it to actually counteract.
-        }
-
-        @Override
         public void moveSection(ElementLink<WorldSectionElement> link, Vec3 offset, int duration) {
             addInstruction(new AnimateElementInstruction<>(link, offset, duration,
                 WorldSectionElement::setAnimatedOffset, WorldSectionElement::getAnimatedOffset));

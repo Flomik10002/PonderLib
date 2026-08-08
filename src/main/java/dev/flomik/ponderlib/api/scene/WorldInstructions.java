@@ -155,14 +155,6 @@ public interface WorldInstructions {
     void configureCenterOfRotation(ElementLink<WorldSectionElement> link, Vec3 anchor);
 
     /**
-     * Accepted for parity with real Create's own {@code WorldInstructions} — this library has no
-     * parent/child section hierarchy (contraption-style movement is out of scope, see {@code
-     * docs/PLAN.md}), so there is nothing here for a stabilization anchor to counteract yet; the
-     * value is stored but has no observable effect on its own.
-     */
-    void configureStabilization(ElementLink<WorldSectionElement> link, Vec3 anchor);
-
-    /**
      * Moves {@code link}'s section by {@code offset} (relative to its current offset), linearly
      * over {@code duration} ticks.
      */
