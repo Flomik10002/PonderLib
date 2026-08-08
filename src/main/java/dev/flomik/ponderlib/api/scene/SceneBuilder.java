@@ -4,6 +4,9 @@ import dev.flomik.ponderlib.foundation.PonderScene;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import dev.flomik.ponderlib.api.element.ElementLink;
+import dev.flomik.ponderlib.api.element.PonderElement;
 
 /**
  * The imperative "enqueue an instruction" API a {@link PonderStoryBoard} programs against.
@@ -22,6 +25,9 @@ public interface SceneBuilder {
     EffectInstructions effects();
 
     PonderScene getScene();
+    <E extends PonderElement> ElementLink<E> addElement(Class<E> type, Supplier<? extends E> factory);
+    <E extends PonderElement> void modifyElement(ElementLink<E> link, Consumer<E> action);
+    void removeElement(ElementLink<? extends PonderElement> link);
 
     /**
      * Assigns a title for this scene, shown in the UI.
@@ -56,6 +62,7 @@ public interface SceneBuilder {
      * markers on a video's scrub bar.
      */
     void addKeyframe();
+    void addKeyframe(String title);
 
     /**
      * Same as {@link #addKeyframe()}, but marks a point 6 ticks later - for right after a
@@ -63,6 +70,7 @@ public interface SceneBuilder {
      * yet (e.g. a section still sliding/fading in) and snapping exactly there would look abrupt.
      */
     void addLazyKeyframe();
+    void addLazyKeyframe(String title);
 
     void addInstruction(PonderInstruction instruction);
 

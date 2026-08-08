@@ -9,6 +9,8 @@ import dev.flomik.ponderlib.foundation.element.WorldSectionElementImpl;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 import dev.flomik.ponderlib.foundation.registration.SchematicLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -64,11 +66,18 @@ public class PonderScene {
     private boolean nextUpEnabled = true;
     private int currentTime;
     private int totalTime;
+    private int schedulingCursor;
     private boolean stoppedCounting;
-    private final List<Integer> keyframeTimes = new ArrayList<>();
+    private boolean suppressSounds;
+    private final List<Keyframe> keyframes = new ArrayList<>();
+    public record Keyframe(int time, Component title) {}
 
     private PonderScene() {
-        this.level = new PonderLevel(Minecraft.getInstance().level);
+        this(new PonderLevel(Minecraft.getInstance().level));
+    }
+
+    PonderScene(PonderLevel level) {
+        this.level = level;
         this.particles = new PonderSceneParticles(level);
         level.setParticleSink(particles);
         level.setBlockStateSink((pos, state) -> updateVisibleSections(elements, pos, state));
@@ -219,13 +228,9 @@ public class PonderScene {
         currentTime = 0;
         totalTime = 0;
         stoppedCounting = false;
-        keyframeTimes.clear();
-        // totalTime is NOT a naive sum of every instruction's own duration - that would overcount
-        // non-blocking ones (fades/text/animation run alongside
-        // whatever's next, they don't extend the scene's serial length) and inflate totalTime past
-        // what seekToTime could ever actually reach, leaving a dead zone at the end of the scrubber.
-        // Each instruction reports its own contribution via addToSceneTime from onScheduled instead
-        // (see TickingInstruction#onScheduled) - only blocking ones (DelayInstruction) call it.
+        keyframes.clear();
+        schedulingCursor = 0;
+        // Track a serial blocking cursor and the furthest parallel non-blocking end point.
         for (PonderInstruction instruction : schedule) {
             instruction.onScheduled(this);
         }
@@ -269,9 +274,6 @@ public class PonderScene {
             instruction.tick(this);
             if (instruction.isComplete()) {
                 iterator.remove();
-                if (instruction.isBlocking()) {
-                    break;
-                }
                 continue;
             }
             if (instruction.isBlocking()) {
@@ -312,9 +314,13 @@ public class PonderScene {
      * what it's forced to wait for, nothing more.
      */
     public void addToSceneTime(int time) {
-        if (!stoppedCounting) {
-            totalTime += time;
-        }
+        scheduleDuration(time, true);
+    }
+
+    public void scheduleDuration(int time, boolean blocking) {
+        if (stoppedCounting || time < 0) return;
+        totalTime = Math.max(totalTime, schedulingCursor + time);
+        if (blocking) schedulingCursor += time;
     }
 
     /**
@@ -334,18 +340,24 @@ public class PonderScene {
      * that come later.
      */
     public void markKeyframe(int offset) {
+        markKeyframe(offset, null);
+    }
+
+    public void markKeyframe(int offset, String title) {
         if (!stoppedCounting) {
-            keyframeTimes.add(totalTime + offset);
+            keyframes.add(new Keyframe(schedulingCursor + offset,
+                title == null || title.isBlank() ? Component.empty() : Component.literal(title)));
         }
     }
 
     public int getKeyframeCount() {
-        return keyframeTimes.size();
+        return keyframes.size();
     }
 
     public int getKeyframeTime(int index) {
-        return keyframeTimes.get(index);
+        return keyframes.get(index).time();
     }
+    public Component getKeyframeTitle(int index) { return keyframes.get(index).title(); }
 
     /**
      * Jumps playback to {@code time} ticks from the start: seeking backwards restarts the scene
@@ -357,14 +369,19 @@ public class PonderScene {
         if (time < currentTime) {
             begin();
         }
-        while (currentTime < time && !finished) {
-            tick();
-        }
+        suppressSounds = true;
+        try { while (currentTime < time && !activeSchedule.isEmpty()) tick(); }
+        finally { suppressSounds = false; }
+    }
+
+    public void playSound(SoundEvent sound, float volume, float pitch) {
+        if (!suppressSounds) Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(sound, pitch, volume));
     }
 
     public void addElement(PonderElement element) {
         elements.add(element);
     }
+    public void removeElement(PonderElement element) { element.setVisible(false); elements.remove(element); linkedElements.values().removeIf(linked -> linked == element); }
 
     public Set<PonderElement> getElements() {
         return elements;
@@ -376,6 +393,12 @@ public class PonderScene {
 
     public boolean isFinished() {
         return finished;
+    }
+    public boolean hasRemainingInstructions() { return !activeSchedule.isEmpty(); }
+    public int measureRuntimeTicks(int safetyLimit) {
+        begin(); suppressSounds = true; int ticks=0;
+        try { while(!activeSchedule.isEmpty() && ticks<safetyLimit){tick();ticks++;} return activeSchedule.isEmpty()?ticks:-1; }
+        finally { suppressSounds=false; }
     }
 
     public void setTitle(Component title) {

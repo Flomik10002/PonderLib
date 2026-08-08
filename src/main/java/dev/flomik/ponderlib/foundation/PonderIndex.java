@@ -3,7 +3,9 @@ package dev.flomik.ponderlib.foundation;
 import dev.flomik.ponderlib.api.PonderColorScheme;
 import dev.flomik.ponderlib.api.registration.PonderPlugin;
 import dev.flomik.ponderlib.foundation.registration.DefaultPonderSceneRegistrationHelper;
+import dev.flomik.ponderlib.foundation.registration.DefaultPonderTagRegistrationHelper;
 import dev.flomik.ponderlib.foundation.registration.PonderSceneRegistry;
+import dev.flomik.ponderlib.foundation.registration.PonderTagRegistry;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +26,7 @@ public final class PonderIndex {
     // to the plugin instance itself.
     private static final Map<String, PonderPlugin> PLUGINS_BY_MOD_ID = new HashMap<>();
     private static final PonderSceneRegistry SCENES = new PonderSceneRegistry();
+    private static final PonderTagRegistry TAGS = new PonderTagRegistry();
     private static boolean registered;
 
     private PonderIndex() {
@@ -39,14 +42,17 @@ public final class PonderIndex {
             return;
         }
         registered = true;
+        for (PonderPlugin plugin : PLUGINS) plugin.registerTags(new DefaultPonderTagRegistrationHelper(plugin.getModId(), TAGS));
         for (PonderPlugin plugin : PLUGINS) {
             plugin.registerScenes(new DefaultPonderSceneRegistrationHelper(plugin.getModId(), SCENES));
         }
+        SCENES.getAllEntries().forEach(entry -> entry.getTags().forEach(tag -> { TAGS.registerLegacyIfAbsent(tag); TAGS.addComponent(tag, entry.getComponent()); }));
     }
 
     public static PonderSceneRegistry getScenes() {
         return SCENES;
     }
+    public static PonderTagRegistry getTags() { return TAGS; }
 
     /**
      * The colour scheme registered for {@code modId} (via that mod's own {@code

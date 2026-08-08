@@ -20,11 +20,8 @@ public abstract class PonderInstruction {
     /**
      * Called once when this instruction is (re-)placed onto the active schedule (see
      * {@link PonderScene#begin()}) - this, not a naive sum of every instruction's own duration, is
-     * how {@link PonderScene#getTotalTime()} gets computed: only {@link
-     * TickingInstruction#isBlocking() blocking} instructions actually extend the scene's serial
-     * length (see its override) - non-blocking ones (fades, text, animations) run alongside
-     * whatever comes next and would otherwise inflate the scrubber's range past what {@code
-     * seekToTime} can ever actually reach.
+     * how {@link PonderScene#getTotalTime()} gets computed. Blocking instructions advance the
+     * serial cursor; non-blocking ones report a parallel end point without advancing it.
      */
     public void onScheduled(PonderScene scene) {
     }

@@ -7,11 +7,13 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraftforge.client.model.data.ModelData;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -72,8 +74,29 @@ public class SceneRenderBuffer {
         if (buffers.isEmpty()) {
             buffers.add(bake(view, model, state, pos, random, seed, RenderType.solid()));
         }
+        FluidState fluidState = state.getFluidState();
+        if (!fluidState.isEmpty()) {
+            buffers.add(bakeFluid(view, state, fluidState, pos, ItemBlockRenderTypes.getRenderLayer(fluidState)));
+        }
         return buffers;
     }
+
+    private static SceneRenderBuffer bakeFluid(VirtualBlockView view, BlockState state, FluidState fluidState,
+                                                BlockPos pos, RenderType renderType) {
+        Minecraft mc = Minecraft.getInstance();
+        BufferBuilder bufferBuilder = new BufferBuilder(2048);
+        bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        mc.getBlockRenderer().renderLiquid(pos, view, bufferBuilder, state, fluidState);
+        BufferBuilder.RenderedBuffer mesh = bufferBuilder.end();
+        int vertexCount = mesh.drawState().vertexCount();
+        if (vertexCount == 0) return new SceneRenderBuffer(renderType, ByteBuffer.allocateDirect(0), 0);
+        ByteBuffer rendered = mesh.vertexBuffer().order(ByteOrder.nativeOrder());
+        ByteBuffer copy = ByteBuffer.allocateDirect(vertexCount * VERTEX_SIZE).order(ByteOrder.nativeOrder());
+        copy.put(rendered).flip();
+        return new SceneRenderBuffer(renderType, copy, vertexCount);
+    }
+
+    static boolean needsFluidPass(BlockState state) { return !state.getFluidState().isEmpty(); }
 
     private static SceneRenderBuffer bake(VirtualBlockView view, BakedModel model, BlockState state, BlockPos pos,
                                            RandomSource random, long seed, RenderType renderType) {

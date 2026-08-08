@@ -23,6 +23,10 @@ public interface PonderPlugin {
     default void registerScenes(PonderSceneRegistrationHelper helper) {
     }
 
+    /** Registers navigation groups whose members keep their own independent storyboards. */
+    default void registerTags(PonderTagRegistrationHelper helper) {
+    }
+
     /**
      * @return the colours (base plate shadow/flash, tooltip border, timeline/button chrome) shown
      *         while playing one of THIS plugin's own scenes. Defaults to {@link

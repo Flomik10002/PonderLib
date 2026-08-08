@@ -35,6 +35,7 @@ import dev.flomik.ponderlib.foundation.instruction.MarkAsFinishedInstruction;
 import dev.flomik.ponderlib.foundation.instruction.OutlineInstruction;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 import dev.flomik.ponderlib.foundation.instruction.RevealSectionInstruction;
+import dev.flomik.ponderlib.foundation.instruction.AddElementInstruction;
 import dev.flomik.ponderlib.foundation.instruction.TextInstruction;
 import dev.flomik.ponderlib.foundation.registration.PonderLocalization;
 import net.minecraft.core.BlockPos;
@@ -315,11 +316,13 @@ public class PonderSceneBuilder implements SceneBuilder {
     public void addKeyframe() {
         addInstruction(KeyframeInstruction.IMMEDIATE);
     }
+    @Override public void addKeyframe(String title) { addInstruction(KeyframeInstruction.named(title, false)); }
 
     @Override
     public void addLazyKeyframe() {
         addInstruction(KeyframeInstruction.DELAYED);
     }
+    @Override public void addLazyKeyframe(String title) { addInstruction(KeyframeInstruction.named(title, true)); }
 
     @Override
     public void addInstruction(PonderInstruction instruction) {
@@ -330,6 +333,9 @@ public class PonderSceneBuilder implements SceneBuilder {
     public void addInstruction(Consumer<PonderScene> callback) {
         addInstruction(PonderInstruction.simple(callback));
     }
+    @Override public <E extends dev.flomik.ponderlib.api.element.PonderElement> ElementLink<E> addElement(Class<E> type, java.util.function.Supplier<? extends E> factory) { ElementLink<E> link=new SimpleElementLink<>(type); addInstruction(new AddElementInstruction<>(factory,link)); return link; }
+    @Override public <E extends dev.flomik.ponderlib.api.element.PonderElement> void modifyElement(ElementLink<E> link, Consumer<E> action) { addInstruction(s -> { E e=s.resolve(link); if(e!=null)action.accept(e); }); }
+    @Override public void removeElement(ElementLink<? extends dev.flomik.ponderlib.api.element.PonderElement> link) { addInstruction(s -> { dev.flomik.ponderlib.api.element.PonderElement e=s.resolve(link); if(e!=null)s.removeElement(e); }); }
 
     @Override
     public void idle(int ticks) {
@@ -896,6 +902,7 @@ public class PonderSceneBuilder implements SceneBuilder {
         private static final int SUCCESS_INDICATOR_COUNT = 6;
 
         private final RandomSource random = RandomSource.create();
+        @Override public void playSound(net.minecraft.sounds.SoundEvent sound, float volume, float pitch) { addInstruction(s -> s.playSound(sound, volume, pitch)); }
 
         // Goes straight through the scene's level - PonderLevel routes it into the scene's particle
         // pool, see PonderLevel#addParticle. Uses DustParticleOptions (ParticleTypes.DUST, what

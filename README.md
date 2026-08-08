@@ -18,6 +18,36 @@ scene.overlay().showControls(target, Pointing.DOWN, 40).drop();
 
 The window renders `Drop [Q]` by default and follows the player's current key binding.
 
+## Navigation tags
+
+```java
+public void registerTags(PonderTagRegistrationHelper helper) {
+    helper.registerTag("functional_flowers")
+        .title("Functional Flowers")
+        .description("Flowers that interact with the world using mana")
+        .icon(ModBlocks.BELLOTHORN)
+        .addToIndex()
+        .register();
+    helper.addToTag(helper.asLocation("functional_flowers"), ModBlocks.BELLOTHORN, ModBlocks.HOPPERHOCK);
+}
+```
+
+The category appears beside each member's scene while every component keeps its own storyboards.
+
+## Chapters, sound, custom elements, diagnostics
+
+```java
+scene.addKeyframe("Generating mana");
+scene.effects().playSound(ModSounds.MANA_BURST, .8f, 1f);
+ElementLink<MyElement> link = scene.addElement(MyElement.class, MyElement::new);
+scene.modifyElement(link, element -> element.setAmount(10));
+scene.removeElement(link);
+```
+
+Sounds are suppressed while seeking. Custom element factories are replay-safe.
+`PonderDoctor.validateAll()` checks resources, tag metadata, keyframes, compilation, completion and
+declared versus measured playback time.
+
 ## Licensing
 
 Copyright (c) 2026 Flomik

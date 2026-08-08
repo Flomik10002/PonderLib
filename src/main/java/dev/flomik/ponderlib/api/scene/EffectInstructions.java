@@ -4,6 +4,7 @@ import dev.flomik.ponderlib.api.ParticleEmitter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.sounds.SoundEvent;
 
 /**
  * Special effects to embellish and communicate with — the visual language for "something just
@@ -11,6 +12,8 @@ import net.minecraft.world.phys.Vec3;
  * never a bare decoration).
  */
 public interface EffectInstructions {
+    void playSound(SoundEvent sound, float volume, float pitch);
+    default void playSound(SoundEvent sound) { playSound(sound, 1F, 1F); }
 
     /**
      * Emits {@code count} short-lived colored sparks scattering outward from {@code position} — real
