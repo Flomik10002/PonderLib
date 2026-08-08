@@ -30,6 +30,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkSource;
@@ -40,7 +41,6 @@ import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.level.storage.WritableLevelData;
 import net.minecraft.world.phys.AABB;
@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -85,6 +86,8 @@ public class PonderLevel extends Level {
     private final LevelEntityGetter<Entity> entityGetter = new DummyLevelEntityGetter<>();
     @Nullable
     private PonderParticleSink particleSink;
+    @Nullable
+    private BiConsumer<BlockPos, BlockState> blockStateSink;
 
     public PonderLevel(Level real) {
         super((WritableLevelData) real.getLevelData(), real.dimension(), real.registryAccess(),
@@ -97,7 +100,15 @@ public class PonderLevel extends Level {
      * aren't a real, ticking world, there's nothing to notify.
      */
     public void setBlockDirect(BlockPos pos, BlockState state) {
-        storeBlockState(blocks, blockEntities, pos, state);
+        BlockPos immutable = pos.immutable();
+        storeBlockState(blocks, blockEntities, immutable, state);
+        if (!blockEntities.containsKey(immutable) && state.getBlock() instanceof EntityBlock entityBlock) {
+            BlockEntity blockEntity = entityBlock.newBlockEntity(immutable, state);
+            if (blockEntity != null) {
+                setBlockEntityDirect(immutable, blockEntity);
+            }
+        }
+        notifyBlockStateChanged(immutable, state);
     }
 
     /**
@@ -111,7 +122,12 @@ public class PonderLevel extends Level {
         blocks.put(immutable, state);
         BlockEntity blockEntity = blockEntities.get(immutable);
         if (blockEntity != null) {
-            blockEntity.setBlockState(state);
+            if (blockEntity.getType().isValid(state)) {
+                blockEntity.setBlockState(state);
+            } else {
+                blockEntity.setRemoved();
+                blockEntities.remove(immutable);
+            }
         }
     }
 
@@ -124,15 +140,32 @@ public class PonderLevel extends Level {
         blockEntity.setLevel(this);
         BlockPos immutable = pos.immutable();
         BlockState state = blocks.get(immutable);
-        if (state != null) {
-            blockEntity.setBlockState(state);
+        if (state == null || !blockEntity.getType().isValid(state)) {
+            blockEntity.setRemoved();
+            return;
         }
-        blockEntities.put(immutable, blockEntity);
+        blockEntity.setBlockState(state);
+        blockEntity.clearRemoved();
+        BlockEntity previous = blockEntities.put(immutable, blockEntity);
+        if (previous != null && previous != blockEntity) {
+            previous.setRemoved();
+        }
+        notifyBlockStateChanged(immutable, state);
+    }
+
+    public void setBlockStateSink(@Nullable BiConsumer<BlockPos, BlockState> blockStateSink) {
+        this.blockStateSink = blockStateSink;
+    }
+
+    private void notifyBlockStateChanged(BlockPos pos, BlockState state) {
+        if (blockStateSink != null) {
+            blockStateSink.accept(pos, state);
+        }
     }
 
     /**
      * Snapshots every currently-registered block entity's saved data, so it can be restored later
-     * (see {@link #resetBlockEntities()}). Called once, right after a scene's schematic finishes
+     * (see {@link #resetWorld()}). Called once, right after a scene's schematic finishes
      * loading (see {@code PonderScene#compile}) - before any storyboard instruction has had a
      * chance to mutate a block entity's own state (e.g. a chest's {@code openCount}).
      */
@@ -146,30 +179,34 @@ public class PonderLevel extends Level {
     /**
      * Resets every position in {@code positions} back to whatever {@link #createBackup} last
      * snapshotted there (air, for a position with no schematic-original entry) - the backing of
-     * {@code WorldInstructions#restoreBlocks}. Only affects this virtual world's own block map; an
-     * already-captured {@code WorldSectionElementImpl} keeps showing whatever it captured until a
-     * later {@code showSection} call re-captures the restored state.
+     * {@code WorldInstructions#restoreBlocks}. Block-state listeners propagate the restored state
+     * and block entity into any section that is already visible.
      */
     public void restoreBlocks(Iterable<BlockPos> positions) {
         for (BlockPos pos : positions) {
             BlockPos immutable = pos.immutable();
-            setBlockDirect(immutable, originalBlocks.getOrDefault(immutable, Blocks.AIR.defaultBlockState()));
+            BlockState originalState = originalBlocks.getOrDefault(immutable, Blocks.AIR.defaultBlockState());
+            setBlockDirect(immutable, originalState);
+            CompoundTag originalData = originalBlockEntityData.get(immutable);
+            if (originalData != null) {
+                BlockEntity fresh = BlockEntity.loadStatic(immutable, originalState, originalData);
+                if (fresh != null) {
+                    setBlockEntityDirect(immutable, fresh);
+                }
+            }
         }
     }
 
     /**
-     * Replaces every block entity with a freshly-loaded copy of its {@link #createBackup}
-     * snapshot - called from {@code PonderScene#begin()} (every scene (re)start/replay, including
-     * every {@code seekToTime} backward seek), so a chest {@code triggerEvent}'d open (or any
-     * other block entity mutated) by an earlier playthrough starts over closed - matching the
-     * schematic's actual saved state - instead of carrying its old, mutated state into the new
-     * playthrough. {@code PonderLevel}'s block entities are otherwise long-lived, shared instances
-     * ({@link #getBlockEntity} always returns the SAME object, not a fresh read) - unlike blocks
-     * (plain {@link BlockState} values, trivially "reset" just by never being mutated after
-     * schematic load), a block entity carries its own internal Java state that only IT knows how
-     * to reset, so there's no way to fix this without going through its own NBT round-trip.
+     * Restores both block states and block entities to the snapshot captured by
+     * {@link #createBackup()}. Replacing only the block entities is insufficient: a replay after
+     * {@code destroyBlock} or {@code modifyBlock} would otherwise start from the previous run's
+     * mutated block map.
      */
-    public void resetBlockEntities() {
+    public void resetWorld() {
+        blockEntities.values().forEach(BlockEntity::setRemoved);
+        blockEntities.clear();
+        restoreBlockMap(blocks, originalBlocks);
         for (Map.Entry<BlockPos, CompoundTag> entry : originalBlockEntityData.entrySet()) {
             BlockPos pos = entry.getKey();
             BlockState state = blocks.get(pos);
@@ -181,6 +218,11 @@ public class PonderLevel extends Level {
                 setBlockEntityDirect(pos, fresh);
             }
         }
+    }
+
+    static void restoreBlockMap(Map<BlockPos, BlockState> blocks, Map<BlockPos, BlockState> originalBlocks) {
+        blocks.clear();
+        blocks.putAll(originalBlocks);
     }
 
     @Override
@@ -195,8 +237,23 @@ public class PonderLevel extends Level {
     }
 
     @Override
+    public void setBlockEntity(BlockEntity blockEntity) {
+        setBlockEntityDirect(blockEntity.getBlockPos(), blockEntity);
+    }
+
+    @Override
+    public void removeBlockEntity(BlockPos pos) {
+        BlockPos immutable = pos.immutable();
+        BlockEntity removed = blockEntities.remove(immutable);
+        if (removed != null) {
+            removed.setRemoved();
+            notifyBlockStateChanged(immutable, getBlockState(immutable));
+        }
+    }
+
+    @Override
     public FluidState getFluidState(BlockPos pos) {
-        return Fluids.EMPTY.defaultFluidState();
+        return getBlockState(pos).getFluidState();
     }
 
     @Override
@@ -436,7 +493,7 @@ public class PonderLevel extends Level {
 
     /**
      * Drops every entity a storyboard has created so far - called from {@code PonderScene#begin()}
-     * on every (re)start/replay, the same moment {@link #resetBlockEntities()} already runs.
+     * on every (re)start/replay, the same moment {@link #resetWorld()} runs.
      * Schematics carry no entities of their own, only blocks/block entities, so a scene's entity
      * list is always empty right after loading - a plain clear is enough to get back there.
      */

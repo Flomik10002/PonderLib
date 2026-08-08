@@ -5,6 +5,7 @@ import dev.flomik.ponderlib.api.element.ElementLink;
 import dev.flomik.ponderlib.api.element.PonderElement;
 import dev.flomik.ponderlib.api.registration.StoryBoardEntry;
 import dev.flomik.ponderlib.api.scene.PonderStoryBoard;
+import dev.flomik.ponderlib.foundation.element.WorldSectionElementImpl;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 import dev.flomik.ponderlib.foundation.registration.SchematicLoader;
 import net.minecraft.client.Minecraft;
@@ -21,6 +22,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,7 @@ public class PonderScene {
     private final List<PonderInstruction> activeSchedule = new ArrayList<>();
     private final Set<PonderElement> elements = new LinkedHashSet<>();
     private final Map<UUID, PonderElement> linkedElements = new HashMap<>();
+    private final Set<BlockEntity> tickedBlockEntities = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
     private final PonderLevel level;
     private final PonderSceneParticles particles;
 
@@ -68,6 +71,7 @@ public class PonderScene {
         this.level = new PonderLevel(Minecraft.getInstance().level);
         this.particles = new PonderSceneParticles(level);
         level.setParticleSink(particles);
+        level.setBlockStateSink((pos, state) -> updateVisibleSections(elements, pos, state));
     }
 
     public static PonderScene compile(PonderStoryBoard storyBoard) {
@@ -102,7 +106,7 @@ public class PonderScene {
         }
         // Snapshot every block entity's freshly-loaded (schematic-saved) state right here, before
         // the storyboard runs and has any chance to mutate one (e.g. a chest's triggerEvent
-        // toggling its own openCount) - see PonderLevel#createBackup/resetBlockEntities.
+        // toggling its own openCount) - see PonderLevel#createBackup/resetWorld.
         scene.level.createBackup();
         // The schematic location is already namespaced to whichever mod registered this entry
         // (see DefaultPonderSceneRegistrationHelper#asLocation) - reuse that for both lang-key
@@ -123,6 +127,24 @@ public class PonderScene {
 
     public void setBlockState(BlockPos pos, BlockState state) {
         level.setBlockDirect(pos, state);
+    }
+
+    public void restoreBlocks(Iterable<BlockPos> positions) {
+        level.restoreBlocks(positions);
+    }
+
+    /**
+     * Captured world sections own their rendered block-state snapshot. Mutating the virtual level
+     * alone therefore cannot change a section that is already on screen; keep every visible copy
+     * of the position synchronized with the level mutation.
+     */
+    static void updateVisibleSections(Iterable<PonderElement> elements, BlockPos pos, BlockState state) {
+        for (PonderElement element : elements) {
+            if (element instanceof WorldSectionElementImpl section && section.isVisible()
+                && section.getBlockPositions().contains(pos)) {
+                section.setBlockState(pos, state);
+            }
+        }
     }
 
     public BlockState getBlockState(BlockPos pos) {
@@ -162,6 +184,10 @@ public class PonderScene {
     }
 
     public void begin() {
+        // Drop old render snapshots before resetting the level: setBlockDirect notifications during
+        // reset must not rebake elements belonging to the previous playthrough.
+        elements.clear();
+        linkedElements.clear();
         // A block entity is a long-lived, mutable Java object (see PonderLevel#getBlockEntity) -
         // unlike a plain BlockState, replaying the schedule from scratch doesn't reset ITS internal
         // state on its own (a chest's triggerEvent-driven openCount/openness, say). Reset it back
@@ -170,7 +196,7 @@ public class PonderScene {
         // playthrough's chest left open doesn't carry that state into this one - with identify mode
         // paused, nothing would otherwise tick forward to close it again the way normal, unpaused
         // playback does within the same or next frame.
-        level.resetBlockEntities();
+        level.resetWorld();
         // Entities are storyboard-created transient content, same reasoning as particles below: a
         // scene's schematic never carries entities of its own (see PonderLevel#clearEntities), so
         // there's nothing to reset THEM to except gone - otherwise a replay/rewind would pile up a
@@ -189,8 +215,6 @@ public class PonderScene {
             instruction.reset(this);
             activeSchedule.add(instruction);
         }
-        elements.clear();
-        linkedElements.clear();
         finished = false;
         currentTime = 0;
         totalTime = 0;
@@ -231,6 +255,7 @@ public class PonderScene {
     public void tick() {
         particles.tick();
         level.tickEntities();
+        tickedBlockEntities.clear();
         for (PonderElement element : elements) {
             element.tick(this);
         }
@@ -257,6 +282,10 @@ public class PonderScene {
         if (activeSchedule.isEmpty()) {
             finished = true;
         }
+    }
+
+    public boolean claimBlockEntityTick(BlockEntity blockEntity) {
+        return tickedBlockEntities.add(blockEntity);
     }
 
     /**

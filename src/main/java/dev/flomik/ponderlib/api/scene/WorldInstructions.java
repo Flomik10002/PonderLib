@@ -22,14 +22,15 @@ import java.util.function.UnaryOperator;
 public interface WorldInstructions {
 
     /**
-     * Places a block in the scene's virtual world, for {@link #showSection} to later pick up.
+     * Places a block in the scene's virtual world. Already-visible sections update immediately;
+     * future {@link #showSection} calls capture the same state.
      */
     void setBlock(BlockPos pos, BlockState state);
 
     /**
      * {@link #setBlock(BlockPos, BlockState)}, optionally spawning the same break-style particle
      * burst {@link #destroyBlock} uses — for a placement that should visually call attention to
-     * itself once a later {@link #showSection} reveals it.
+     * itself whether the position is already visible or revealed later.
      */
     void setBlock(BlockPos pos, BlockState state, boolean spawnParticles);
 
@@ -54,9 +55,8 @@ public interface WorldInstructions {
 
     /**
      * Resets every position in {@code selection} back to whatever the schematic originally had there
-     * (or air, for a scene with no schematic) — undoes {@link #setBlock}/{@link #destroyBlock}. Only
-     * affects the scene's virtual world; a section that already captured the overridden state via
-     * {@link #showSection} keeps showing it until revealed again.
+     * (or air, for a scene with no schematic) — undoes {@link #setBlock}/{@link #destroyBlock} in
+     * both the virtual world and every visible section, including the original block entity data.
      */
     void restoreBlocks(Selection selection);
 
