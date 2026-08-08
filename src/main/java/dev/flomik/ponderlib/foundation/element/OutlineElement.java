@@ -28,12 +28,23 @@ public class OutlineElement implements PonderSceneElement {
     // outline read as the same kind of mark.
     private static final float THICKNESS = 0.05F;
 
-    private final Selection selection;
+    private Selection selection;
     private PonderPalette palette = PonderPalette.WHITE;
     private boolean visible;
     private float fade;
 
     public OutlineElement(Selection selection) {
+        this.selection = selection;
+    }
+
+    /**
+     * Retargets an already-built element to a new selection — the mechanism behind {@code
+     * OverlayInstructions#showOutline(PonderPalette, Object, Selection, int)}'s {@code slot}: a
+     * repeated call under the same slot reuses this same element (see {@code
+     * PonderSceneBuilder.OverlayInstructionsImpl}'s slot map) and just moves it here instead of
+     * creating a second, competing outline.
+     */
+    public void setSelection(Selection selection) {
         this.selection = selection;
     }
 

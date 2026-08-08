@@ -85,6 +85,7 @@ public class PonderLevel extends Level {
     private final Map<BlockPos, BlockState> blocks = new HashMap<>();
     private final Map<BlockPos, BlockEntity> blockEntities = new HashMap<>();
     private final Map<BlockPos, CompoundTag> originalBlockEntityData = new HashMap<>();
+    private final Map<BlockPos, BlockState> originalBlocks = new HashMap<>();
     private final List<Entity> entities = new ArrayList<>();
     private final LevelEntityGetter<Entity> entityGetter = new DummyLevelEntityGetter<>();
     @Nullable
@@ -123,6 +124,22 @@ public class PonderLevel extends Level {
     public void createBackup() {
         originalBlockEntityData.clear();
         blockEntities.forEach((pos, blockEntity) -> originalBlockEntityData.put(pos, blockEntity.saveWithFullMetadata(registryAccess())));
+        originalBlocks.clear();
+        originalBlocks.putAll(blocks);
+    }
+
+    /**
+     * Resets every position in {@code positions} back to whatever {@link #createBackup} last
+     * snapshotted there (air, for a position with no schematic-original entry) - the backing of
+     * {@code WorldInstructions#restoreBlocks}. Only affects this virtual world's own block map; an
+     * already-captured {@code WorldSectionElementImpl} keeps showing whatever it captured until a
+     * later {@code showSection} call re-captures the restored state.
+     */
+    public void restoreBlocks(Iterable<BlockPos> positions) {
+        for (BlockPos pos : positions) {
+            BlockPos immutable = pos.immutable();
+            blocks.put(immutable, originalBlocks.getOrDefault(immutable, Blocks.AIR.defaultBlockState()));
+        }
     }
 
     /**
