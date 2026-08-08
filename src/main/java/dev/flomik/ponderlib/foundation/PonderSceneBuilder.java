@@ -570,9 +570,14 @@ public class PonderSceneBuilder implements SceneBuilder {
         @Override
         public void incrementBlockBreakingProgress(BlockPos pos) {
             BlockPos immutable = pos.immutable();
-            int stage = breakingProgress.merge(immutable, 1, Integer::sum) % 10;
+            int stage = (breakingProgress.getOrDefault(immutable, -1) + 1) % 10;
             breakingProgress.put(immutable, stage);
-            addInstruction(s -> spawnBreakParticles(s, immutable, currentDisplayedState(s, immutable), 3));
+            addInstruction(s -> {
+                for (WorldSectionElementImpl section : sectionsContaining(s, immutable)) {
+                    section.setBreakingStage(immutable, stage);
+                }
+                spawnBreakParticles(s, immutable, currentDisplayedState(s, immutable), 3);
+            });
         }
 
         @Override
@@ -684,16 +689,39 @@ public class PonderSceneBuilder implements SceneBuilder {
             addInstruction(new OutlineInstruction(element, duration));
         }
 
+        // Build-time only (one PonderSceneBuilder per compiled scene, discarded once program()
+        // returns) - keyed by whatever arbitrary Object a storyboard passes as its own "this outline
+        // identifies the same thing across calls" token. See OutlineInstruction/
+        // BoundingBoxOutlineInstruction's own javadoc for why reusing the element (rather than the
+        // simpler-looking "just spawn a new one every call") is what actually avoids two outlines
+        // fighting for the same slot's visibility.
+        private final Map<Object, OutlineElement> slottedOutlines = new HashMap<>();
+        private final Map<Object, BoundingBoxOutlineElement> slottedBoxOutlines = new HashMap<>();
+
         @Override
         public void showOutline(PonderPalette palette, Object slot, Selection selection, int duration) {
-            showOutline(palette, selection, duration);
+            if (slot == null) {
+                showOutline(palette, selection, duration);
+                return;
+            }
+            boolean firstUse = !slottedOutlines.containsKey(slot);
+            OutlineElement element = slottedOutlines.computeIfAbsent(slot, k -> new OutlineElement(selection));
+            element.setPalette(palette);
+            addInstruction(new OutlineInstruction(element, duration, firstUse ? null : selection));
         }
 
         @Override
         public void chaseBoundingBoxOutline(PonderPalette color, Object slot, AABB boundingBox, int duration) {
-            BoundingBoxOutlineElement element = new BoundingBoxOutlineElement(boundingBox);
+            if (slot == null) {
+                BoundingBoxOutlineElement element = new BoundingBoxOutlineElement(boundingBox);
+                element.setPalette(color);
+                addInstruction(new BoundingBoxOutlineInstruction(element, duration));
+                return;
+            }
+            boolean firstUse = !slottedBoxOutlines.containsKey(slot);
+            BoundingBoxOutlineElement element = slottedBoxOutlines.computeIfAbsent(slot, k -> new BoundingBoxOutlineElement(boundingBox));
             element.setPalette(color);
-            addInstruction(new BoundingBoxOutlineInstruction(element, duration));
+            addInstruction(new BoundingBoxOutlineInstruction(element, duration, firstUse ? null : boundingBox));
         }
 
         @Override

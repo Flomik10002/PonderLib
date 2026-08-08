@@ -28,10 +28,12 @@ public interface OverlayInstructions {
     void showOutline(PonderPalette palette, Selection selection, int duration);
 
     /**
-     * {@link #showOutline}, with a {@code slot} argument accepted for parity with real Create's own
-     * signature (there, an opaque per-block marker for highlighting one specific inventory slot
-     * region instead of the whole block). This library only ever outlines whole positions — {@code
-     * slot} is accepted and ignored.
+     * {@link #showOutline}, keyed by an arbitrary {@code slot} object identifying "this outline" as
+     * the same logical thing across separate calls. A repeated call with the same {@code slot}
+     * (anywhere later in the same storyboard) retargets that existing outline to the new {@code
+     * selection} instead of spawning a second one competing for the same highlight — the way to move
+     * one outline to follow something across several beats without leaking a new element per call.
+     * The first call for a given {@code slot} behaves exactly like the 3-argument overload.
      */
     void showOutline(PonderPalette palette, Object slot, Selection selection, int duration);
 
@@ -44,12 +46,12 @@ public interface OverlayInstructions {
     TextElementBuilder showOutlineWithText(Selection selection, int duration, String text);
 
     /**
-     * {@link #showOutline(PonderPalette, Object, Selection, int)}'s outline-following-a-moving-
-     * target counterpart: outlines one arbitrary {@link AABB} instead of a block-grid {@link
-     * Selection} — for highlighting something that isn't aligned to whole blocks, e.g. an entity's
-     * own hitbox. Re-queue this each tick with a freshly read box to actually "chase" a moving
-     * target; a single call just outlines wherever the box was at that moment, same as any other
-     * {@code FadeInOutInstruction}-backed overlay.
+     * {@link #showOutline(PonderPalette, Object, Selection, int)}'s counterpart for something that
+     * isn't aligned to whole blocks — an arbitrary {@link AABB} (an entity's own hitbox, say) instead
+     * of a block-grid {@link Selection} — with the exact same {@code slot} retargeting behaviour:
+     * call it again later in the storyboard with the same {@code slot} and a freshly read box to
+     * make the one outline "chase" wherever its target has moved to since, instead of spawning a new
+     * outline at each beat.
      */
     void chaseBoundingBoxOutline(PonderPalette color, Object slot, AABB boundingBox, int duration);
 

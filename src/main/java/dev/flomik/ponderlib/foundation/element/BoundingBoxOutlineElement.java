@@ -20,12 +20,21 @@ public class BoundingBoxOutlineElement implements PonderSceneElement {
 
     private static final float THICKNESS = 0.05F;
 
-    private final AABB box;
+    private AABB box;
     private PonderPalette palette = PonderPalette.WHITE;
     private boolean visible;
     private float fade;
 
     public BoundingBoxOutlineElement(AABB box) {
+        this.box = box;
+    }
+
+    /**
+     * Retargets an already-built element to a new box — the "chase" half of {@code
+     * OverlayInstructions#chaseBoundingBoxOutline}'s {@code slot}: a repeated call under the same
+     * slot reuses this element and moves it here instead of spawning a second, competing outline.
+     */
+    public void setBox(AABB box) {
         this.box = box;
     }
 

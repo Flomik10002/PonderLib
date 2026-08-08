@@ -10,9 +10,11 @@ import dev.flomik.ponderlib.render.SceneRenderBuffer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -49,8 +51,17 @@ public class WorldSectionElementImpl implements WorldSectionElement {
     private final Map<BlockPos, BlockState> blocks = new LinkedHashMap<>();
     private final Map<BlockPos, BlockEntity> blockEntities = new LinkedHashMap<>();
     private final Map<BlockState, List<SceneRenderBuffer>> bakedByState = new LinkedHashMap<>();
+    // 0..9 (ModelBakery.DESTROY_STAGE_COUNT - 1), no entry = no crack overlay - see
+    // #setBreakingStage/WorldInstructions#incrementBlockBreakingProgress.
+    private final Map<BlockPos, Integer> breakingStages = new LinkedHashMap<>();
     private boolean visible;
     private boolean basePlate;
+
+    // Stashed at #capture so #render can pass a real BlockAndTintGetter to vanilla's own
+    // BlockRenderDispatcher#renderBreakingTexture for the crack overlay - the baked SceneRenderBuffer
+    // geometry this element normally renders through has no such dependency, this is the one path
+    // that goes through vanilla's real block model renderer instead.
+    private PonderLevel level;
 
     private Vec3 animatedRotation = Vec3.ZERO;
     private Vec3 animatedOffset = Vec3.ZERO;
@@ -77,6 +88,7 @@ public class WorldSectionElementImpl implements WorldSectionElement {
      * element owns its own render/tick data and no longer depends on the level.
      */
     public void capture(PonderLevel level) {
+        this.level = level;
         for (BlockPos pos : selection) {
             BlockPos immutable = pos.immutable();
             BlockState state = level.getBlockState(pos);
@@ -106,6 +118,23 @@ public class WorldSectionElementImpl implements WorldSectionElement {
 
     public BlockState getBlockState(BlockPos pos) {
         return blocks.get(pos);
+    }
+
+    /**
+     * Sets/advances the crack overlay stage shown at {@code pos} - see {@code
+     * WorldInstructions#incrementBlockBreakingProgress}. {@code stage < 0} removes the overlay
+     * entirely; otherwise clamped to vanilla's own 0..{@code ModelBakery.DESTROY_STAGE_COUNT - 1}
+     * range. A no-op if {@code pos} isn't one of this section's own captured positions.
+     */
+    public void setBreakingStage(BlockPos pos, int stage) {
+        if (!blocks.containsKey(pos)) {
+            return;
+        }
+        if (stage < 0) {
+            breakingStages.remove(pos);
+        } else {
+            breakingStages.put(pos, Mth.clamp(stage, 0, ModelBakery.DESTROY_STAGE_COUNT - 1));
+        }
     }
 
     @Override
@@ -326,7 +355,30 @@ public class WorldSectionElementImpl implements WorldSectionElement {
             if (blockEntity != null) {
                 renderBlockEntity(poseStack, blockTransform, blockEntity, buffer, partialTick);
             }
+
+            Integer stage = breakingStages.get(pos);
+            if (stage != null && level != null) {
+                renderBreakingOverlay(poseStack, blockTransform, entry.getValue(), pos, level, buffer, stage);
+            }
         }
+    }
+
+    /**
+     * Vanilla's own mining crack texture, drawn through the real {@link BlockRenderDispatcher} —
+     * unlike this element's own baked {@link SceneRenderBuffer} geometry, this goes through the real
+     * block model renderer directly (it's the only vanilla API surface for this effect), so it needs
+     * a real {@code BlockAndTintGetter} ({@link #level}, stashed at {@link #capture}) rather than
+     * this element's own captured state.
+     */
+    private static void renderBreakingOverlay(PoseStack poseStack, Matrix4f blockTransform, BlockState state,
+                                               BlockPos pos, PonderLevel level, MultiBufferSource buffer, int stage) {
+        BlockRenderDispatcher dispatcher = Minecraft.getInstance().getBlockRenderer();
+        VertexConsumer consumer = buffer.getBuffer(ModelBakery.DESTROY_TYPES.get(stage));
+        poseStack.pushPose();
+        poseStack.last().pose().mul(blockTransform);
+        poseStack.last().normal().mul(new Matrix3f(blockTransform));
+        dispatcher.renderBreakingTexture(state, pos, level, poseStack, consumer);
+        poseStack.popPose();
     }
 
     @SuppressWarnings("unchecked")

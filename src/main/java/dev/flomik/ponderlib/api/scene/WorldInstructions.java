@@ -169,11 +169,10 @@ public interface WorldInstructions {
     void moveSection(ElementLink<WorldSectionElement> link, Vec3 offset, int duration);
 
     /**
-     * Advances a per-position mining-progress counter (0..9, vanilla's own crack-stage range) by
-     * one stage per call, wrapping back to 0 once it would pass the last stage, and spawns a small
-     * particle cue each time — the visual language of a player actively mining a block. Doesn't
-     * render vanilla's own crack-texture overlay (that needs hooking a Forge/vanilla rendering
-     * internal this library doesn't otherwise touch); the particle cue is the observable effect.
+     * Shows vanilla's own mining crack overlay on {@code pos} (via {@code
+     * BlockRenderDispatcher#renderBreakingTexture}), advancing one stage (0..9) per call and
+     * wrapping back to 0 once it would pass the last stage, paired with a small particle cue each
+     * time — the same visual language as a player actively mining a block.
      */
     void incrementBlockBreakingProgress(BlockPos pos);
 
