@@ -229,6 +229,22 @@ public class PonderSceneBuilder implements SceneBuilder {
     }
 
     /**
+     * The single currently-visible {@link WorldSectionElementImpl} whose own captured positions
+     * exactly equal {@code positions} - {@code hideSection}'s way of matching a raw {@link Selection}
+     * back to the element {@code showSection} returned a link for, without requiring the caller to
+     * have kept that link around. {@code null} if nothing visible matches.
+     */
+    private static WorldSectionElementImpl findVisibleSectionMatching(PonderScene scene, Set<BlockPos> positions) {
+        for (PonderElement candidate : scene.getElements()) {
+            if (candidate instanceof WorldSectionElementImpl section && section.isVisible()
+                && section.getBlockPositions().equals(positions)) {
+                return section;
+            }
+        }
+        return null;
+    }
+
+    /**
      * The block currently shown at {@code pos}: an already-revealed section's own captured state if
      * one exists (what the player actually sees), falling back to the scene's virtual world
      * otherwise (a position never shown yet, or restored/overwritten since).
@@ -518,25 +534,16 @@ public class PonderSceneBuilder implements SceneBuilder {
         public void hideSection(Selection selection, Direction fadeOutDirection) {
             Set<BlockPos> positions = new HashSet<>();
             selection.forEach(positions::add);
-            addInstruction(s -> {
-                for (PonderElement candidate : s.getElements()) {
-                    if (candidate instanceof WorldSectionElementImpl section && section.isVisible()
-                        && section.getBlockPositions().equals(positions)) {
-                        addInstruction(new HideSectionInstruction(section, fadeOutDirection, SECTION_FADE_TICKS));
-                        return;
-                    }
-                }
-            });
+            addInstruction(new HideSectionInstruction(
+                s -> findVisibleSectionMatching(s, positions), fadeOutDirection, SECTION_FADE_TICKS));
         }
 
         @Override
         public void hideIndependentSection(ElementLink<WorldSectionElement> link, Direction fadeOutDirection) {
-            addInstruction(s -> {
+            addInstruction(new HideSectionInstruction(s -> {
                 WorldSectionElement element = s.resolve(link);
-                if (element instanceof WorldSectionElementImpl impl) {
-                    addInstruction(new HideSectionInstruction(impl, fadeOutDirection, SECTION_FADE_TICKS));
-                }
-            });
+                return element instanceof WorldSectionElementImpl impl ? impl : null;
+            }, fadeOutDirection, SECTION_FADE_TICKS));
         }
 
         @Override
