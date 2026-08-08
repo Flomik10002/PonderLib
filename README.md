@@ -8,6 +8,16 @@ structure `.nbt` schematic, behaviour from a storyboard written in code.
 
 Docs, API walkthrough, and setup: **[the wiki](https://github.com/Flomik10002/PonderLib/wiki)**.
 
+## Input hints
+
+Storyboards can demonstrate the player's configured drop-item key without hardcoding its default:
+
+```java
+scene.overlay().showControls(target, Pointing.DOWN, 40).drop();
+```
+
+The window renders `Drop [Q]` by default and follows the player's current key binding.
+
 ## Licensing
 
 Copyright (c) 2026 Flomik
