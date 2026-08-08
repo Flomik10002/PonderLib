@@ -26,9 +26,9 @@ import org.joml.Vector4f;
  */
 public class PonderBoxElement {
 
-    private int x;
-    private int y;
-    private int z;
+    private float x;
+    private float y;
+    private float z;
     private int width = 16;
     private int height = 16;
     private int borderOffset = 2;
@@ -38,6 +38,10 @@ public class PonderBoxElement {
     private float alpha = 1F;
 
     public PonderBoxElement at(int x, int y, int z) {
+        return at((float) x, (float) y, (float) z);
+    }
+
+    public PonderBoxElement at(float x, float y, float z) {
         this.x = x;
         this.y = y;
         this.z = z;
@@ -119,18 +123,18 @@ public class PonderBoxElement {
         RenderSystem.disableBlend();
     }
 
-    private void quad(BufferBuilder b, Matrix4f model, int x1, int y1, int x2, int y2, int color) {
+    private void quad(BufferBuilder b, Matrix4f model, float x1, float y1, float x2, float y2, int color) {
         vGradient(b, model, x1, y1, x2, y2, color, color);
     }
 
-    private void vGradient(BufferBuilder b, Matrix4f model, int x1, int y1, int x2, int y2, int topColor, int botColor) {
+    private void vGradient(BufferBuilder b, Matrix4f model, float x1, float y1, float x2, float y2, int topColor, int botColor) {
         vertex(b, model, x1, y1, topColor);
         vertex(b, model, x1, y2, botColor);
         vertex(b, model, x2, y2, botColor);
         vertex(b, model, x2, y1, topColor);
     }
 
-    private void vertex(BufferBuilder b, Matrix4f model, int px, int py, int color) {
+    private void vertex(BufferBuilder b, Matrix4f model, float px, float py, int color) {
         Vector4f pos = new Vector4f(px, py, z, 1F).mul(model);
         b.vertex(pos.x(), pos.y(), pos.z())
             .color((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, (color >>> 24) & 0xFF)
@@ -138,7 +142,7 @@ public class PonderBoxElement {
     }
 
     private static int scaleAlpha(int argb, float factor) {
-        int a = Math.round(((argb >>> 24) & 0xFF) * Mth.clamp(factor, 0F, 1F));
+        int a = (int) (((argb >>> 24) & 0xFF) * Mth.clamp(factor, 0F, 1F));
         return (a << 24) | (argb & 0xFFFFFF);
     }
 }

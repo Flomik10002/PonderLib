@@ -49,6 +49,7 @@ public class PonderScene {
 
     private boolean finished;
     private ResourceLocation component;
+    private Set<ResourceLocation> tags = Set.of();
     // null for a scene with no known registering mod (tests, the direct-PonderStoryBoard compile
     // path below) - getColors() treats that the same as "no override", never a crash.
     private String modId;
@@ -100,6 +101,7 @@ public class PonderScene {
     public static PonderScene compile(StoryBoardEntry entry) {
         PonderScene scene = new PonderScene();
         scene.component = entry.getComponent();
+        scene.tags = Set.copyOf(entry.getTags());
         SchematicLoader.LoadedSchematic schematic = SchematicLoader.load(entry.getSchematicLocation());
         for (StructureTemplate.StructureBlockInfo info : schematic.blocks()) {
             scene.level.setBlockDirect(info.pos(), info.state());
@@ -171,6 +173,10 @@ public class PonderScene {
      */
     public PonderColorScheme getColors() {
         return PonderIndex.colorsFor(modId);
+    }
+
+    public Set<ResourceLocation> getTags() {
+        return tags;
     }
 
     /**

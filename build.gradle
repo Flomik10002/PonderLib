@@ -147,7 +147,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 // Lets a consuming mod's build.gradle depend on this jar via JitPack (implementation
-// "com.github.Flomik10002:PonderLib:v0.1.0-forge") without hosting a Maven repo of our own - JitPack
+// "com.github.Flomik10002:PonderLib:v0.6.0-forge-1.20.1") without hosting a Maven repo of our own - JitPack
 // builds the tagged commit and runs publishToMavenLocal itself, so this publication only needs to
 // exist, not point anywhere reachable. The buildDir repository is for local testing of that
 // publication (./gradlew publish) without needing real repository credentials.

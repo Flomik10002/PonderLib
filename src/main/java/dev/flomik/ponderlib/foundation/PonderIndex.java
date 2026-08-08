@@ -2,6 +2,7 @@ package dev.flomik.ponderlib.foundation;
 
 import dev.flomik.ponderlib.api.PonderColorScheme;
 import dev.flomik.ponderlib.api.registration.PonderPlugin;
+import dev.flomik.ponderlib.api.registration.PonderTag;
 import dev.flomik.ponderlib.foundation.registration.DefaultPonderSceneRegistrationHelper;
 import dev.flomik.ponderlib.foundation.registration.DefaultPonderTagRegistrationHelper;
 import dev.flomik.ponderlib.foundation.registration.PonderSceneRegistry;
@@ -46,7 +47,15 @@ public final class PonderIndex {
         for (PonderPlugin plugin : PLUGINS) {
             plugin.registerScenes(new DefaultPonderSceneRegistrationHelper(plugin.getModId(), SCENES));
         }
-        SCENES.getAllEntries().forEach(entry -> entry.getTags().forEach(tag -> { TAGS.registerLegacyIfAbsent(tag); TAGS.addComponent(tag, entry.getComponent()); }));
+        SCENES.getAllEntries().forEach(entry -> entry.getTags().forEach(tag -> {
+            // Runtime-only sidebar sentinel: it highlights every scene tag, but must never become
+            // a visible/navigation tag of its own.
+            if (PonderTag.HIGHLIGHT_ALL.equals(tag)) {
+                return;
+            }
+            TAGS.registerLegacyIfAbsent(tag);
+            TAGS.addComponent(tag, entry.getComponent());
+        }));
     }
 
     public static PonderSceneRegistry getScenes() {
