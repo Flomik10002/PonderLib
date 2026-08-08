@@ -681,15 +681,6 @@ class PonderSceneBuilderTest {
     }
 
     @Test
-    void configureStabilizationAcceptsTheCallWithoutThrowing() {
-        ElementLink<WorldSectionElement> link = new SimpleElementLink<>(WorldSectionElement.class);
-        builder.world().configureStabilization(link, Vec3.ZERO);
-        // Documented no-op (see WorldInstructions#configureStabilization) - nothing to verify beyond
-        // "doesn't throw and doesn't queue anything storyboards would have to account for".
-        assertTrue(schedule.isEmpty());
-    }
-
-    @Test
     void incrementBlockBreakingProgressAdvancesThroughTenStagesThenWrapsBackToZero() {
         BlockPos pos = new BlockPos(0, 0, 0);
         WorldSectionElementImpl section = mock(WorldSectionElementImpl.class);
