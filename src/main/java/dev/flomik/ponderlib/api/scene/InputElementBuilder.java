@@ -36,6 +36,11 @@ public interface InputElementBuilder {
         }
 
         @Override
+        public InputElementBuilder drop() {
+            return this;
+        }
+
+        @Override
         public InputElementBuilder whileSneaking() {
             return this;
         }
@@ -56,6 +61,13 @@ public interface InputElementBuilder {
     InputElementBuilder rightClick();
 
     InputElementBuilder scroll();
+
+    /**
+     * Shows the player's currently-bound drop-item key. This is a PonderLib extension: upstream
+     * Create's input builder only has mouse buttons, scrolling, and arbitrary asset-backed icons,
+     * with no dedicated drop-key control.
+     */
+    InputElementBuilder drop();
 
     /**
      * Adds a "Sneak" qualifier, for actions that need the sneak key held.

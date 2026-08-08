@@ -823,6 +823,12 @@ public class PonderSceneBuilder implements SceneBuilder {
         }
 
         @Override
+        public InputElementBuilder drop() {
+            element.drop();
+            return this;
+        }
+
+        @Override
         public InputElementBuilder whileSneaking() {
             element.setQualifier("Sneak");
             return this;

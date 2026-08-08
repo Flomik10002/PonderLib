@@ -1,12 +1,22 @@
 # PonderLib
 
-An in-game documentation/tutorial system for NeoForge 1.21.1 mods, distributed as a standalone
+An in-game documentation/tutorial system for Forge 1.20.1 mods, distributed as a standalone
 public API with no external mod dependencies.
 
 Any mod can register scenes for its own blocks and items: static geometry comes from a vanilla
 structure `.nbt` schematic, behaviour from a storyboard written in code.
 
 Docs, API walkthrough, and setup: **[the wiki](https://github.com/Flomik10002/PonderLib/wiki)**.
+
+## Input hints
+
+Storyboards can demonstrate the player's configured drop-item key without hardcoding its default:
+
+```java
+scene.overlay().showControls(target, Pointing.DOWN, 40).drop();
+```
+
+The window renders `Drop [Q]` by default and follows the player's current key binding.
 
 ## Licensing
 

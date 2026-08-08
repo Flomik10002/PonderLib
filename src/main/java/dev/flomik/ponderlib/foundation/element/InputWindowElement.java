@@ -70,6 +70,7 @@ public class InputWindowElement implements PonderOverlayElement {
     private final Pointing pointing;
     @Nullable
     private String[] icon;
+    private boolean drop;
     private ItemStack item = ItemStack.EMPTY;
     @Nullable
     private Component qualifier;
@@ -82,15 +83,31 @@ public class InputWindowElement implements PonderOverlayElement {
     }
 
     public void leftClick() {
+        drop = false;
         icon = ICON_LEFT_CLICK;
     }
 
     public void rightClick() {
+        drop = false;
         icon = ICON_RIGHT_CLICK;
     }
 
     public void scroll() {
+        drop = false;
         icon = ICON_SCROLL;
+    }
+
+    public void drop() {
+        icon = null;
+        drop = true;
+    }
+
+    static Component dropControlFor(Component keyName) {
+        return Component.literal("Drop [").append(keyName.copy()).append("]");
+    }
+
+    boolean isDrop() {
+        return drop;
     }
 
     public void setItem(ItemStack item) {
@@ -127,13 +144,19 @@ public class InputWindowElement implements PonderOverlayElement {
         Font font = screen.getFont();
         Vec2 anchor = screen.sceneToScreen(scene, sceneSpace);
 
+        Component dropControl = drop
+            ? dropControlFor(Minecraft.getInstance().options.keyDrop.getTranslatedKeyMessage())
+            : null;
+
         int iconWidth = icon == null ? 0 : PonderIconMask.width(icon);
         int iconHeight = icon == null ? 0 : PonderIconMask.height(icon);
+        int dropWidth = dropControl == null ? 0 : font.width(dropControl);
         int itemWidth = item.isEmpty() ? 0 : 16;
         int qualifierWidth = qualifier == null ? 0 : font.width(qualifier) + 2;
 
-        int contentWidth = iconWidth + (itemWidth > 0 ? itemWidth + 2 : 0) + qualifierWidth;
-        int contentHeight = Math.max(Math.max(iconHeight, itemWidth), qualifier == null ? 0 : 9);
+        int contentWidth = iconWidth + (dropWidth > 0 ? dropWidth + 2 : 0)
+            + (itemWidth > 0 ? itemWidth + 2 : 0) + qualifierWidth;
+        int contentHeight = Math.max(Math.max(iconHeight, itemWidth), dropControl == null && qualifier == null ? 0 : 9);
         int boxWidth = contentWidth + PADDING * 2;
         int boxHeight = contentHeight + PADDING * 2;
 
@@ -160,6 +183,13 @@ public class InputWindowElement implements PonderOverlayElement {
             PonderIconMask.render(graphics, icon, cursorX, centreY - iconHeight / 2, 410,
                 (alpha << 24) | (ICON_COLOR & 0xFFFFFF));
             cursorX += iconWidth + 2;
+        }
+        if (dropControl != null) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 410);
+            graphics.drawString(font, dropControl, cursorX, centreY - 4, (alpha << 24) | 0xFFFFFF, false);
+            graphics.pose().popPose();
+            cursorX += dropWidth + 2;
         }
         if (!item.isEmpty()) {
             graphics.pose().pushPose();
