@@ -5,6 +5,7 @@ import dev.flomik.ponderlib.api.PonderPalette;
 import dev.flomik.ponderlib.api.element.ElementLink;
 import dev.flomik.ponderlib.api.element.EntityElement;
 import dev.flomik.ponderlib.api.element.WorldSectionElement;
+import dev.flomik.ponderlib.api.element.PonderElement;
 import dev.flomik.ponderlib.foundation.element.BoundingBoxOutlineElement;
 import dev.flomik.ponderlib.foundation.element.EntityElementImpl;
 import dev.flomik.ponderlib.foundation.element.OutlineElement;
@@ -236,6 +237,38 @@ class PonderSceneBuilderTest {
 
         assertEquals(1, schedule.size());
         assertEquals(dev.flomik.ponderlib.foundation.instruction.KeyframeInstruction.DELAYED, schedule.get(0));
+    }
+
+    @Test
+    void namedKeyframeKeepsItsTitleWhenScheduled() {
+        builder.addKeyframe("Mana generation");
+        schedule.get(0).onScheduled(scene);
+        verify(scene).markKeyframe(0, "Mana generation");
+    }
+
+    @Test
+    void customElementsAreCreatedLinkedModifiedAndRemovedOnTheTimeline() {
+        TestElement element = new TestElement();
+        ElementLink<TestElement> link = builder.addElement(TestElement.class, () -> element);
+        builder.modifyElement(link, value -> value.modified = true);
+        builder.removeElement(link);
+
+        schedule.get(0).tick(scene);
+        verify(scene).addElement(element);
+        verify(scene).linkElement(element, link);
+
+        when(scene.resolve(link)).thenReturn(element);
+        schedule.get(1).tick(scene);
+        assertTrue(element.modified);
+        schedule.get(2).tick(scene);
+        verify(scene).removeElement(element);
+    }
+
+    private static final class TestElement implements PonderElement {
+        private boolean visible;
+        private boolean modified;
+        @Override public boolean isVisible() { return visible; }
+        @Override public void setVisible(boolean visible) { this.visible = visible; }
     }
 
     @Test

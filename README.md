@@ -18,6 +18,46 @@ scene.overlay().showControls(target, Pointing.DOWN, 40).drop();
 
 The window renders `Drop [Q]` by default and follows the player's current key binding.
 
+## Navigation tags
+
+Related components can be collected into a navigable category without sharing their scenes:
+
+```java
+public void registerTags(PonderTagRegistrationHelper helper) {
+    helper.registerTag("functional_flowers")
+        .title("Functional Flowers")
+        .description("Flowers that interact with the world using mana")
+        .icon(ModBlocks.BELLOTHORN)
+        .addToIndex()
+        .register();
+
+    helper.addToTag(helper.asLocation("functional_flowers"),
+        ModBlocks.BELLOTHORN, ModBlocks.HOPPERHOCK);
+}
+```
+
+The category appears as a tab beside each member's scene and opens a component browser. Each
+component still owns and opens only its own storyboards.
+
+## Chapters, sound, and custom elements
+
+```java
+scene.addKeyframe("Generating mana");
+scene.effects().playSound(ModSounds.MANA_BURST, .8f, 1f);
+
+ElementLink<MyElement> link = scene.addElement(MyElement.class, MyElement::new);
+scene.modifyElement(link, element -> element.setAmount(10));
+scene.removeElement(link);
+```
+
+Named keyframes display their chapter title on the scrubber. Sounds are suppressed while seeking,
+so jumping through a scene does not replay every skipped cue. Custom element factories run again
+on replay, making their links safe across rewind and seek operations.
+
+`PonderDoctor.validateAll()` performs read-only development diagnostics for missing schematics,
+empty category metadata, components without scenes, invalid keyframe positions, compilation
+failures, scenes that never finish, and disagreement between declared and measured playback time.
+
 ## Licensing
 
 Copyright (c) 2026 Flomik

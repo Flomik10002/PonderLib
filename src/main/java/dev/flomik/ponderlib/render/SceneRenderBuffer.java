@@ -9,11 +9,13 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import net.neoforged.neoforge.client.model.data.ModelData;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -74,7 +76,33 @@ public class SceneRenderBuffer {
         if (buffers.isEmpty()) {
             buffers.add(bake(view, model, state, pos, random, seed, RenderType.solid()));
         }
+        FluidState fluidState = state.getFluidState();
+        if (!fluidState.isEmpty()) {
+            buffers.add(bakeFluid(view, state, fluidState, pos, ItemBlockRenderTypes.getRenderLayer(fluidState)));
+        }
         return buffers;
+    }
+
+    /** Fluids have no baked block-model quads; vanilla emits them through renderLiquid instead. */
+    private static SceneRenderBuffer bakeFluid(VirtualBlockView view, BlockState state, FluidState fluidState,
+                                                BlockPos pos, RenderType renderType) {
+        try (ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(2048)) {
+            BufferBuilder bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS,
+                DefaultVertexFormat.BLOCK);
+            Minecraft.getInstance().getBlockRenderer().renderLiquid(pos, view, bufferBuilder, state, fluidState);
+            try (MeshData mesh = bufferBuilder.build()) {
+                if (mesh == null) return new SceneRenderBuffer(renderType, ByteBuffer.allocateDirect(0), 0);
+                ByteBuffer rendered = mesh.vertexBuffer().order(ByteOrder.nativeOrder());
+                int vertexCount = mesh.drawState().vertexCount();
+                ByteBuffer copy = ByteBuffer.allocateDirect(vertexCount * VERTEX_SIZE).order(ByteOrder.nativeOrder());
+                copy.put(rendered).flip();
+                return new SceneRenderBuffer(renderType, copy, vertexCount);
+            }
+        }
+    }
+
+    static boolean needsFluidPass(BlockState state) {
+        return !state.getFluidState().isEmpty();
     }
 
     private static SceneRenderBuffer bake(VirtualBlockView view, BakedModel model, BlockState state, BlockPos pos,

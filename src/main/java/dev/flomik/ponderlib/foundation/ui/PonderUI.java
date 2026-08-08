@@ -12,6 +12,7 @@ import dev.flomik.ponderlib.api.element.PonderElement;
 import dev.flomik.ponderlib.api.element.PonderOverlayElement;
 import dev.flomik.ponderlib.api.element.PonderSceneElement;
 import dev.flomik.ponderlib.api.registration.StoryBoardEntry;
+import dev.flomik.ponderlib.api.registration.PonderTag;
 import dev.flomik.ponderlib.foundation.PonderIndex;
 import dev.flomik.ponderlib.foundation.PonderScene;
 import dev.flomik.ponderlib.foundation.element.TextWindowElement;
@@ -115,6 +116,7 @@ public class PonderUI extends Screen {
     // One item can have several registered scenes, and the left/right buttons page between them.
     // `scene` is a view onto the active one so the rest of this class reads unchanged.
     private final List<PonderScene> scenes;
+    private Screen previousScreen;
     private int index;
     private boolean scrubbingTimeline;
     private boolean identifyMode;
@@ -224,6 +226,17 @@ public class PonderUI extends Screen {
         return ui;
     }
 
+    public PonderUI withPreviousScreen(Screen previousScreen) {
+        this.previousScreen = previousScreen;
+        return this;
+    }
+
+    @Override
+    public void onClose() {
+        if (previousScreen != null) minecraft.setScreen(previousScreen);
+        else super.onClose();
+    }
+
     /**
      * The item this screen's scene is "about", so {@code foundation.PonderTooltipHandler} can show
      * a green "already open" hint instead of the hold-progress bar when hovering that exact item
@@ -278,6 +291,16 @@ public class PonderUI extends Screen {
 
         slowModeButton = addRenderableWidget(new PonderButton(width - 20 - 31, bY, PonderButton.Icon.SLOW,
             Component.literal("Slow reading pace"), this::toggleComfyReading, this::activeColors));
+
+        ResourceLocation component = scene().getComponent();
+        if (component != null) {
+            int tagY = 28;
+            for (PonderTag tag : PonderIndex.getTags().getTags(component)) {
+                addRenderableWidget(new PonderTagButton(4, tagY, tag,
+                    () -> minecraft.setScreen(new PonderTagScreen(tag, this))));
+                tagY += 34;
+            }
+        }
 
         updateButtonStates();
     }
@@ -635,6 +658,10 @@ public class PonderUI extends Screen {
         renderKeyframeMarks(graphics, barWidth, hoverIndex);
 
         poseStack.popPose();
+        if (hoverIndex >= 0 && hoverIndex < scene().getKeyframeCount()
+            && !scene().getKeyframeTitle(hoverIndex).getString().isBlank()) {
+            graphics.renderTooltip(font, scene().getKeyframeTitle(hoverIndex), mouseX, mouseY);
+        }
     }
 
     /**

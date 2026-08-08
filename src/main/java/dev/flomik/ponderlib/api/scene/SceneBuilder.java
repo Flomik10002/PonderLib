@@ -4,6 +4,9 @@ import dev.flomik.ponderlib.foundation.PonderScene;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import dev.flomik.ponderlib.api.element.ElementLink;
+import dev.flomik.ponderlib.api.element.PonderElement;
 
 /**
  * The imperative "enqueue an instruction" API a {@link PonderStoryBoard} programs against.
@@ -22,6 +25,15 @@ public interface SceneBuilder {
     EffectInstructions effects();
 
     PonderScene getScene();
+
+    /** Adds a third-party element when playback reaches this point and returns a stable replay-safe link. */
+    <E extends PonderElement> ElementLink<E> addElement(Class<E> type, Supplier<? extends E> factory);
+
+    /** Mutates a previously added custom or built-in element at this point in the timeline. */
+    <E extends PonderElement> void modifyElement(ElementLink<E> link, Consumer<E> action);
+
+    /** Removes a previously added element from rendering and ticking. */
+    void removeElement(ElementLink<? extends PonderElement> link);
 
     /**
      * Assigns a title for this scene, shown in the UI.
@@ -57,12 +69,18 @@ public interface SceneBuilder {
      */
     void addKeyframe();
 
+    /** Adds a named chapter at the current timeline position. */
+    void addKeyframe(String title);
+
     /**
      * Same as {@link #addKeyframe()}, but marks a point 6 ticks later - for right after a
      * blocking wait, when the very first frames of whatever comes next haven't visually "landed"
      * yet (e.g. a section still sliding/fading in) and snapping exactly there would look abrupt.
      */
     void addLazyKeyframe();
+
+    /** Adds a named chapter six ticks after the current timeline position. */
+    void addLazyKeyframe(String title);
 
     void addInstruction(PonderInstruction instruction);
 

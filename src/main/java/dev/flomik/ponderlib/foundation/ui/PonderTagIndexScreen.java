@@ -1,6 +1,7 @@
 package dev.flomik.ponderlib.foundation.ui;
 
 import dev.flomik.ponderlib.foundation.PonderIndex;
+import dev.flomik.ponderlib.api.registration.PonderTag;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -33,9 +34,10 @@ public class PonderTagIndexScreen extends Screen {
     protected void init() {
         TagList list = new TagList(minecraft, width, height - LIST_TOP - LIST_BOTTOM_MARGIN, LIST_TOP, ENTRY_HEIGHT);
         String currentNamespace = null;
-        for (ResourceLocation tag : PonderIndex.getScenes().getAllTags()) {
-            if (!tag.getNamespace().equals(currentNamespace)) {
-                currentNamespace = tag.getNamespace();
+        for (PonderTag tag : PonderIndex.getTags().getAll()) {
+            if (!tag.isIndexed()) continue;
+            if (!tag.id().getNamespace().equals(currentNamespace)) {
+                currentNamespace = tag.id().getNamespace();
                 list.addHeaderEntry(currentNamespace);
             }
             list.addTagEntry(tag);
@@ -69,13 +71,13 @@ public class PonderTagIndexScreen extends Screen {
             addEntry(new TagRow(namespace));
         }
 
-        void addTagEntry(ResourceLocation tag) {
+        void addTagEntry(PonderTag tag) {
             addEntry(new TagRow(tag));
         }
 
         private final class TagRow extends ObjectSelectionList.Entry<TagRow> {
 
-            private final ResourceLocation tag;
+            private final PonderTag tag;
             private final Component label;
 
             private TagRow(String namespaceHeader) {
@@ -83,9 +85,9 @@ public class PonderTagIndexScreen extends Screen {
                 this.label = Component.literal(namespaceHeader).withStyle(ChatFormatting.BOLD, ChatFormatting.YELLOW);
             }
 
-            private TagRow(ResourceLocation tag) {
+            private TagRow(PonderTag tag) {
                 this.tag = tag;
-                this.label = Component.literal("  #" + tag.getPath());
+                this.label = tag.title();
             }
 
             @Override
@@ -108,7 +110,8 @@ public class PonderTagIndexScreen extends Screen {
                     // Header row - not a real entry, just a section label; nothing to open.
                     return false;
                 }
-                Minecraft.getInstance().setScreen(new PonderIndexScreen(tag));
+                Minecraft minecraft = Minecraft.getInstance();
+                minecraft.setScreen(new PonderTagScreen(tag, minecraft.screen));
                 return true;
             }
         }

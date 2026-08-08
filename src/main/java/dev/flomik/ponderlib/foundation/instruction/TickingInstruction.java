@@ -40,9 +40,8 @@ public abstract class TickingInstruction extends PonderInstruction {
     @Override
     public void onScheduled(PonderScene scene) {
         super.onScheduled(scene);
-        if (isBlocking()) {
-            scene.addToSceneTime(totalTicks);
-        }
+        if (isBlocking()) scene.addToSceneTime(totalTicks);
+        else scene.scheduleDuration(totalTicks, false);
     }
 
     @Override

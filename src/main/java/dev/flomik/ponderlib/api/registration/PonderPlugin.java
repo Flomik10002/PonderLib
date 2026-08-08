@@ -24,6 +24,14 @@ public interface PonderPlugin {
     }
 
     /**
+     * Registers semantic groups of related components. Unlike scene tags, these groups are
+     * navigation: every component keeps its own storyboards while the Ponder UI exposes a tab
+     * leading to the other members of the group.
+     */
+    default void registerTags(PonderTagRegistrationHelper helper) {
+    }
+
+    /**
      * @return the colours (base plate shadow/flash, tooltip border, timeline/button chrome) shown
      *         while playing one of THIS plugin's own scenes. Defaults to {@link
      *         PonderColorScheme#DEFAULT} - override only if your mod wants its own palette. This is

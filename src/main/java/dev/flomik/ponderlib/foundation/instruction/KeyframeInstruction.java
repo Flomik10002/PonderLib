@@ -8,13 +8,19 @@ import dev.flomik.ponderlib.foundation.PonderScene;
  */
 public class KeyframeInstruction extends PonderInstruction {
 
-    public static final KeyframeInstruction IMMEDIATE = new KeyframeInstruction(false);
-    public static final KeyframeInstruction DELAYED = new KeyframeInstruction(true);
+    public static final KeyframeInstruction IMMEDIATE = new KeyframeInstruction(false, null);
+    public static final KeyframeInstruction DELAYED = new KeyframeInstruction(true, null);
 
     private final boolean delayed;
+    private final String title;
 
-    private KeyframeInstruction(boolean delayed) {
+    private KeyframeInstruction(boolean delayed, String title) {
         this.delayed = delayed;
+        this.title = title;
+    }
+
+    public static KeyframeInstruction named(String title, boolean delayed) {
+        return new KeyframeInstruction(delayed, title);
     }
 
     @Override
@@ -28,6 +34,7 @@ public class KeyframeInstruction extends PonderInstruction {
 
     @Override
     public void onScheduled(PonderScene scene) {
-        scene.markKeyframe(delayed ? 6 : 0);
+        if (title == null) scene.markKeyframe(delayed ? 6 : 0);
+        else scene.markKeyframe(delayed ? 6 : 0, title);
     }
 }
