@@ -97,7 +97,22 @@ public class PonderLevel extends Level {
      * aren't a real, ticking world, there's nothing to notify.
      */
     public void setBlockDirect(BlockPos pos, BlockState state) {
-        blocks.put(pos.immutable(), state);
+        storeBlockState(blocks, blockEntities, pos, state);
+    }
+
+    /**
+     * Keeps a virtual world's block map and an already-instantiated block entity in agreement.
+     * Vanilla normally performs this synchronization as part of its chunk mutation path; this
+     * stripped-down level owns no chunks, so its direct map write has to do it explicitly.
+     */
+    static void storeBlockState(Map<BlockPos, BlockState> blocks, Map<BlockPos, BlockEntity> blockEntities,
+                                BlockPos pos, BlockState state) {
+        BlockPos immutable = pos.immutable();
+        blocks.put(immutable, state);
+        BlockEntity blockEntity = blockEntities.get(immutable);
+        if (blockEntity != null) {
+            blockEntity.setBlockState(state);
+        }
     }
 
     /**
@@ -107,7 +122,12 @@ public class PonderLevel extends Level {
      */
     public void setBlockEntityDirect(BlockPos pos, BlockEntity blockEntity) {
         blockEntity.setLevel(this);
-        blockEntities.put(pos.immutable(), blockEntity);
+        BlockPos immutable = pos.immutable();
+        BlockState state = blocks.get(immutable);
+        if (state != null) {
+            blockEntity.setBlockState(state);
+        }
+        blockEntities.put(immutable, blockEntity);
     }
 
     /**
@@ -133,7 +153,7 @@ public class PonderLevel extends Level {
     public void restoreBlocks(Iterable<BlockPos> positions) {
         for (BlockPos pos : positions) {
             BlockPos immutable = pos.immutable();
-            blocks.put(immutable, originalBlocks.getOrDefault(immutable, Blocks.AIR.defaultBlockState()));
+            setBlockDirect(immutable, originalBlocks.getOrDefault(immutable, Blocks.AIR.defaultBlockState()));
         }
     }
 

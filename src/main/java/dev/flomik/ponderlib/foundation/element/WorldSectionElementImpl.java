@@ -126,6 +126,10 @@ public class WorldSectionElementImpl implements WorldSectionElement {
             return;
         }
         blocks.put(pos, state);
+        BlockEntity blockEntity = blockEntities.get(pos);
+        if (blockEntity != null) {
+            blockEntity.setBlockState(state);
+        }
         // computeIfAbsent, not put - bakeAll re-tesselates and bakes a fresh GPU buffer (see
         // SceneRenderBuffer), real work worth skipping if this exact state was already baked for
         // this section before (e.g. toggling a furnace's LIT property back and forth).
