@@ -50,6 +50,9 @@ public class PonderScene {
 
     private boolean finished;
     private ResourceLocation component;
+    // Scene labels are kept at runtime because Create's sidebar independently pulses the tag
+    // buttons that describe the active storyboard (including the special `_all` sentinel).
+    private Set<ResourceLocation> tags = Set.of();
     // null for a scene with no known registering mod (tests, the direct-PonderStoryBoard compile
     // path below) - getColors() treats that the same as "no override", never a crash.
     private String modId;
@@ -102,6 +105,7 @@ public class PonderScene {
     public static PonderScene compile(StoryBoardEntry entry) {
         PonderScene scene = new PonderScene();
         scene.component = entry.getComponent();
+        scene.tags = Set.copyOf(entry.getTags());
         RegistryAccess registryAccess = scene.level.registryAccess();
         SchematicLoader.LoadedSchematic schematic = SchematicLoader.load(entry.getSchematicLocation());
         for (StructureTemplate.StructureBlockInfo info : schematic.blocks()) {
@@ -174,6 +178,10 @@ public class PonderScene {
      */
     public PonderColorScheme getColors() {
         return PonderIndex.colorsFor(modId);
+    }
+
+    public Set<ResourceLocation> getTags() {
+        return tags;
     }
 
     /**

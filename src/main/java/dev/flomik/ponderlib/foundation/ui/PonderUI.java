@@ -38,6 +38,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -101,6 +102,8 @@ public class PonderUI extends Screen {
     // PonderScene#getColors) rather than hardcoded constants.
     private static final int KEYFRAME_HEIGHT_IDLE = 4;
     private static final int KEYFRAME_HEIGHT_HOVER = 8;
+    private static final float KEYFRAME_HOVER_CHASE = .35F;
+    private static final int KEYFRAME_PROXIMITY_PIXELS = 8;
     // Exponential chase factor for the bar fill - see #chaseTimelineProgress.
     private static final float TIMELINE_CHASE_FACTOR = 0.5F;
     // Extra tick delay when comfy reading is on: tick the scene every 3rd tick instead of every one.
@@ -112,10 +115,17 @@ public class PonderUI extends Screen {
 
     private static final Component IDENTIFY_HINT =
         Component.literal("Hover a block to inspect it").withStyle(ChatFormatting.GRAY);
+    private static final Component THINK_BACK = Component.translatable("ponderlib.ui.think_back");
+    private static final float BACK_ECHO_CHASE = .075F;
 
     // One item can have several registered scenes, and the left/right buttons page between them.
     // `scene` is a view onto the active one so the rest of this class reads unchanged.
     private final List<PonderScene> scenes;
+    // Create resolves this list once from the first scene's component. Paging only changes which
+    // buttons pulse; it never rebuilds or reorders the sidebar.
+    private final List<PonderTag> tags;
+    private List<PonderButton> tagButtons = new ArrayList<>();
+    private List<TagHoverFade> tagFades = new ArrayList<>();
     private Screen previousScreen;
     private int index;
     private boolean scrubbingTimeline;
@@ -139,8 +149,16 @@ public class PonderUI extends Screen {
     private PonderButton slowModeButton;
     private PonderButton leftButton;
     private PonderButton rightButton;
+    private PonderButton backTrackButton;
+    private float backEchoPrevious;
+    private float backEchoValue;
 
     private float timelineProgressValue;
+    private int timelineHoveredKeyframe = -2;
+    private int keyframeMotionScene = -1;
+    private float[] keyframeMotionPrevious = new float[0];
+    private float[] keyframeMotionValue = new float[0];
+    private int uiTicks;
 
     // finishingFlash's previous/value pair only ever changes via a direct assignment (see
     // #tickFinishingFlash), never a target-chase - Mth.lerp(partialTick, previous, value) is all
@@ -156,6 +174,15 @@ public class PonderUI extends Screen {
     private float nextUpPrevious;
     private float nextUpValue;
 
+    private float fadeInPrevious;
+    private float fadeInValue;
+
+    static final int TAG_BUTTON_X = 31;
+    static final int TAG_BUTTON_Y = 81;
+    static final int TAG_BUTTON_PITCH = 30;
+    private static final int TAG_LABEL_MAX_WIDTH = 200;
+    private static final float TAG_LABEL_CHASE = .05F;
+
     public PonderUI(PonderScene scene) {
         this(List.of(scene));
     }
@@ -166,6 +193,8 @@ public class PonderUI extends Screen {
             throw new IllegalArgumentException("A PonderUI needs at least one scene");
         }
         this.scenes = List.copyOf(scenes);
+        ResourceLocation component = scenes.get(0).getComponent();
+        this.tags = component == null ? List.of() : List.copyOf(PonderIndex.getTags().getTags(component));
     }
 
     /**
@@ -261,48 +290,78 @@ public class PonderUI extends Screen {
     @Override
     protected void init() {
         super.init();
+        tagButtons = new ArrayList<>();
+        tagFades = new ArrayList<>();
+
+        initBackTrack();
+
+        for (int i = 0; i < tags.size(); i++) {
+            PonderTag tag = tags.get(i);
+            PonderButton button = PonderButton.showingTag(TAG_BUTTON_X, tagButtonY(i), tag,
+                () -> minecraft.setScreen(new PonderTagScreen(tag, this)), this::activeColors);
+            addRenderableWidget(button);
+            tagButtons.add(button);
+            tagFades.add(new TagHoverFade());
+        }
+
         int spacing = 8;
         int bY = height - PonderButton.SIZE - 31;
         int bX = (width - PonderButton.SIZE) / 2 - (70 + 2 * spacing);
 
         identifyButton = addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.IDENTIFY,
             Component.literal("Identify"), this::toggleIdentifyMode, this::activeColors)
-            .withShortcut(minecraft.options.keyDrop));
+            .withShortcut(minecraft.options.keyDrop)
+            .withControlMotion(2, uiTicks, 0));
 
         bX += 50 + spacing;
         leftButton = addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.LEFT,
             Component.literal("Previous scene"), () -> scroll(false), this::activeColors)
-            .withShortcut(minecraft.options.keyLeft));
+            .withShortcut(minecraft.options.keyLeft)
+            .withControlMotion(1, uiTicks, -1));
 
         bX += PonderButton.SIZE + spacing;
         addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.CLOSE,
             Component.literal("Close"), this::onClose, this::activeColors)
-            .withShortcut(minecraft.options.keyInventory));
+            .withShortcut(minecraft.options.keyInventory)
+            .withControlMotion(0, uiTicks, 0));
 
         bX += PonderButton.SIZE + spacing;
         rightButton = addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.RIGHT,
             Component.literal("Next scene"), () -> scroll(true), this::activeColors)
-            .withShortcut(minecraft.options.keyRight));
+            .withShortcut(minecraft.options.keyRight)
+            .withControlMotion(1, uiTicks, 1));
 
         bX += 50 + spacing;
         addRenderableWidget(new PonderButton(bX, bY, PonderButton.Icon.REPLAY,
             Component.literal("Replay"), this::replay, this::activeColors)
-            .withShortcut(minecraft.options.keyDown));
+            .withShortcut(minecraft.options.keyDown)
+            .withControlMotion(2, uiTicks, -1));
 
         slowModeButton = addRenderableWidget(new PonderButton(width - 20 - 31, bY, PonderButton.Icon.SLOW,
-            Component.literal("Slow reading pace"), this::toggleComfyReading, this::activeColors));
-
-        ResourceLocation component = scene().getComponent();
-        if (component != null) {
-            int tagY = 28;
-            for (PonderTag tag : PonderIndex.getTags().getTags(component)) {
-                addRenderableWidget(new PonderTagButton(4, tagY, tag,
-                    () -> minecraft.setScreen(new PonderTagScreen(tag, this))));
-                tagY += 34;
-            }
-        }
+            Component.literal("Slow reading pace"), this::toggleComfyReading, this::activeColors)
+            .withControlMotion(3, uiTicks, 0));
 
         updateButtonStates();
+    }
+
+    private void initBackTrack() {
+        backTrackButton = null;
+        if (previousScreen == null) {
+            return;
+        }
+
+        int y = height - 31 - PonderButton.SIZE;
+        if (previousScreen instanceof PonderTagScreen tagScreen) {
+            backTrackButton = PonderButton.showingTag(31, y, tagScreen.getTag(), this::onClose, this::activeColors);
+        } else if (previousScreen instanceof PonderUI ponderUI && !ponderUI.getSubject().isEmpty()) {
+            backTrackButton = new PonderButton(31, y, ponderUI.getSubject(), THINK_BACK,
+                this::onClose, this::activeColors);
+        } else {
+            backTrackButton = new PonderButton(31, y, PonderButton.Icon.RETURN, THINK_BACK,
+                this::onClose, this::activeColors).withCreateLayout();
+        }
+        backTrackButton.withEntranceFade(0, 5, uiTicks);
+        addRenderableWidget(backTrackButton);
     }
 
     /**
@@ -362,6 +421,9 @@ public class PonderUI extends Screen {
         nextUpWarmup = 0;
         nextUpPrevious = 0F;
         nextUpValue = 0F;
+        if (rightButton != null) {
+            rightButton.resetAttention();
+        }
         updateButtonStates();
         return true;
     }
@@ -398,8 +460,7 @@ public class PonderUI extends Screen {
         }
         if (rightButton != null) {
             rightButton.visible = rightButton.active = index < scenes.size() - 1;
-            // Flashes the right arrow once the scene is over, as the nudge to move on.
-            rightButton.setFlashing(rightButton.visible && scene().isFinished());
+            rightButton.setAttention(rightButton.visible && scene().isFinished());
         }
     }
 
@@ -417,6 +478,17 @@ public class PonderUI extends Screen {
 
     @Override
     public void tick() {
+        uiTicks++;
+        backEchoPrevious = backEchoValue;
+        backEchoValue = Math.max(0F, backEchoValue - BACK_ECHO_CHASE);
+
+        fadeInPrevious = fadeInValue;
+        if (Mth.equal(fadeInValue, 1F)) {
+            fadeInValue = 1F;
+        } else {
+            fadeInValue += (1F - fadeInValue) * .1F;
+        }
+
         // Slow mode ("comfy reading"): while it's on AND a text window is currently on screen, the
         // scene ticks once every (extendedTickLength + 1) ticks instead of every tick. The gate on
         // "text is visible" is the whole point - this buys reading time, it doesn't just make the
@@ -435,6 +507,7 @@ public class PonderUI extends Screen {
 
         tickLazyIndex();
         tickTimelineProgress();
+        tickKeyframeMotion();
         tickFinishingFlash();
         tickNextUp();
         for (var child : children()) {
@@ -465,6 +538,10 @@ public class PonderUI extends Screen {
      */
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_BACKSPACE && previousScreen != null) {
+            onClose();
+            return true;
+        }
         if (Minecraft.getInstance().options.keyDrop.matches(keyCode, scanCode)) {
             identifyMode = !identifyMode;
             return true;
@@ -584,8 +661,14 @@ public class PonderUI extends Screen {
         // the furnace/crafting screens - without this the scene floats over a raw, distracting
         // view of whatever the player happens to be standing in.
         this.renderTransparentBackground(graphics);
-        super.render(graphics, mouseX, mouseY, partialTick);
-
+        updateTagHighlights();
+        float screenFade = Mth.lerp(partialTick, fadeInPrevious, fadeInValue);
+        for (var child : children()) {
+            if (child instanceof PonderButton button && button != backTrackButton) {
+                button.setScreenFade(screenFade);
+            }
+        }
+        renderBackNavigation(graphics, partialTick);
         // While lazyIndexValue hasn't caught up to index yet, the scene it's chasing AWAY from is
         // still on screen too (sliding out the opposite side from the one the active scene slides
         // in from) - see #slideOffset.
@@ -600,10 +683,101 @@ public class PonderUI extends Screen {
         if (transitioning && otherIndex != index) {
             renderOverlay(graphics, partialTick, scenes.get(otherIndex));
         }
-        renderTimeline(graphics, mouseX, mouseY);
+        renderTimeline(graphics, mouseX, mouseY, partialTick);
         renderNextUp(graphics, partialTick);
         if (identifyMode) {
             renderIdentifyHover(graphics, mouseX, mouseY);
+        }
+        renderTagSidebar(graphics, mouseX, mouseY, partialTick);
+        RenderSystem.enableDepthTest();
+        for (var renderable : renderables) {
+            renderable.render(graphics, mouseX, mouseY, partialTick);
+        }
+    }
+
+    private void renderBackNavigation(GuiGraphics graphics, float partialTick) {
+        if (backTrackButton == null) {
+            return;
+        }
+
+        float animation = Mth.lerp(partialTick, backEchoPrevious, backEchoValue);
+        int y = height - 51;
+        PonderColorScheme colors = activeColors();
+        PonderStreak.backEcho(graphics, backTrackButton.getX(), y, PonderStreak.BACK_ECHO_Z, PonderButton.SIZE,
+            1F - animation, colors.frameBorderTop(), colors.frameBorderBottom());
+
+        if (!backTrackButton.isHovered() && !backTrackButton.isFocused()) {
+            return;
+        }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 500);
+        graphics.drawString(font, THINK_BACK, 41 - font.width(THINK_BACK) / 2,
+            height - 16, colors.buttonIconDim(), false);
+        graphics.pose().popPose();
+        if (Mth.equal(backEchoValue, 0F)) {
+            backEchoPrevious = 1F;
+            backEchoValue = 1F;
+        }
+    }
+
+    private void updateTagHighlights() {
+        boolean highlightAll = scene().getTags().contains(PonderTag.HIGHLIGHT_ALL);
+        for (int i = 0; i < tagButtons.size(); i++) {
+            tagButtons.get(i).setFlashing(highlightAll || scene().getTags().contains(tags.get(i).id()));
+        }
+    }
+
+    /**
+     * Create's sidebar title is not part of the button. It is a separately animated, 200px streak
+     * clipped from the button's right edge; moving the cursor onto the title therefore closes it.
+     */
+    private void renderTagSidebar(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        double guiScale = Minecraft.getInstance().getWindow().getGuiScale();
+        float screenFade = Mth.lerp(partialTick, fadeInPrevious, fadeInValue);
+
+        for (int i = 0; i < tagButtons.size(); i++) {
+            PonderButton button = tagButtons.get(i);
+            TagHoverFade hover = tagFades.get(i);
+            hover.tick(button.isMouseOver(mouseX, mouseY));
+
+            int x = button.getX() + button.getWidth() + 4;
+            int y = button.getY() - 2;
+            float fadedWidth = TAG_LABEL_MAX_WIDTH * hover.get(partialTick);
+
+            graphics.pose().pushPose();
+            graphics.pose().translate(x, y + 5 * (1 - screenFade), 800);
+            PonderStreak.render(graphics, 0, 0, 12, 26, (int) fadedWidth, activeColors().buttonBackground());
+
+            if (fadedWidth > 0) {
+                RenderSystem.enableScissor((int) (x * guiScale), 0,
+                    (int) (fadedWidth * guiScale), (int) (height * guiScale));
+                graphics.drawString(font, tags.get(i).title(), 3, 8, activeColors().buttonIconLit(), false);
+                RenderSystem.disableScissor();
+            }
+            graphics.pose().popPose();
+        }
+    }
+
+    static int tagButtonY(int index) {
+        return TAG_BUTTON_Y + index * TAG_BUTTON_PITCH;
+    }
+
+    private static final class TagHoverFade {
+        private float previous;
+        private float value;
+
+        void tick(boolean hovered) {
+            previous = value;
+            float target = hovered ? 1F : 0F;
+            if (Mth.equal(value, target)) {
+                value = target;
+            } else {
+                value += (target - value) * TAG_LABEL_CHASE;
+            }
+        }
+
+        float get(float partialTick) {
+            return Mth.lerp(partialTick, previous, value);
         }
     }
 
@@ -621,8 +795,9 @@ public class PonderUI extends Screen {
      * would on every dragged frame. Hidden while the scene has no measurable duration yet (right at
      * scene start, before {@code begin()} sizes it).
      */
-    private void renderTimeline(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderTimeline(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (scene().getTotalTime() <= 0) {
+            timelineHoveredKeyframe = -2;
             return;
         }
         int barX = timelineX();
@@ -655,7 +830,9 @@ public class PonderUI extends Screen {
         // bar at all" (also covers "no keyframes at all", since hoveredKeyframeIndex assumes at
         // least one exists).
         int hoverIndex = scene().getKeyframeCount() > 0 && isOverTimeline(mouseX, mouseY) ? hoveredKeyframeIndex(mouseX) : -2;
-        renderKeyframeMarks(graphics, barWidth, hoverIndex);
+        ensureKeyframeMotion();
+        timelineHoveredKeyframe = hoverIndex;
+        renderKeyframeMarks(graphics, barWidth, hoverIndex, filled, partialTick);
 
         poseStack.popPose();
         if (hoverIndex >= 0 && hoverIndex < scene().getKeyframeCount()
@@ -683,6 +860,44 @@ public class PonderUI extends Screen {
     static float chaseTimelineProgress(float current, float target) {
         float next = current + (target - current) * TIMELINE_CHASE_FACTOR;
         return Math.abs(target - next) < 1 / 512F ? target : next;
+    }
+
+    private void tickKeyframeMotion() {
+        ensureKeyframeMotion();
+        for (int slot = 0; slot < keyframeMotionValue.length; slot++) {
+            keyframeMotionPrevious[slot] = keyframeMotionValue[slot];
+            int keyframe = slot - 1;
+            float target = keyframe == timelineHoveredKeyframe ? 1F : 0F;
+            keyframeMotionValue[slot] = chaseKeyframeMotion(keyframeMotionValue[slot], target);
+        }
+    }
+
+    private void ensureKeyframeMotion() {
+        int slots = scene().getKeyframeCount() + 2;
+        if (keyframeMotionScene == index && keyframeMotionValue.length == slots) {
+            return;
+        }
+        keyframeMotionScene = index;
+        keyframeMotionPrevious = new float[slots];
+        keyframeMotionValue = new float[slots];
+        timelineHoveredKeyframe = -2;
+    }
+
+    private float keyframeMotion(int keyframe, float partialTick) {
+        int slot = keyframe + 1;
+        if (slot < 0 || slot >= keyframeMotionValue.length) {
+            return 0F;
+        }
+        return Mth.lerp(partialTick, keyframeMotionPrevious[slot], keyframeMotionValue[slot]);
+    }
+
+    static float chaseKeyframeMotion(float current, float target) {
+        float next = current + (target - current) * KEYFRAME_HOVER_CHASE;
+        return Math.abs(target - next) < 1 / 512F ? target : next;
+    }
+
+    static float keyframeProximity(int markX, int playheadX) {
+        return 1F - Mth.clamp(Math.abs(markX - playheadX) / (float) KEYFRAME_PROXIMITY_PIXELS, 0F, 1F);
     }
 
     /**
@@ -719,16 +934,20 @@ public class PonderUI extends Screen {
         return Mth.lerp(diff * diff, 200, 600) * diff;
     }
 
-    private void renderKeyframeMarks(GuiGraphics graphics, int barWidth, int hoverIndex) {
+    private void renderKeyframeMarks(GuiGraphics graphics, int barWidth, int hoverIndex,
+                                     int playheadX, float partialTick) {
         int totalTime = scene().getTotalTime();
         int keyframeCount = scene().getKeyframeCount();
 
-        // Two pseudo-keyframes, drawn only while hovered: "rewind to the very start" and
-        // "skip to the very end".
-        if (hoverIndex == -1) {
-            drawKeyframeMark(graphics, 0, 0, true);
-        } else if (hoverIndex == keyframeCount) {
-            drawKeyframeMark(graphics, barWidth + 4, totalTime, true);
+        // The start/end pseudo-marks fade out after the cursor leaves instead of disappearing on
+        // the same frame.
+        float startMotion = keyframeMotion(-1, partialTick);
+        if (hoverIndex == -1 || startMotion > 1 / 512F) {
+            drawKeyframeMark(graphics, 0, 0, true, startMotion, 0F);
+        }
+        float endMotion = keyframeMotion(keyframeCount, partialTick);
+        if (hoverIndex == keyframeCount || endMotion > 1 / 512F) {
+            drawKeyframeMark(graphics, barWidth + 4, totalTime, true, endMotion, 0F);
         }
 
         for (int i = 0; i < keyframeCount; i++) {
@@ -737,35 +956,62 @@ public class PonderUI extends Screen {
             // (width + 4) - kept as two separate constants rather than unified, since a mark's drawn
             // position and its click-snap target don't need to be pixel-identical.
             int x = Math.round(keyframeTime / (float) totalTime * (barWidth + 2));
-            drawKeyframeMark(graphics, x, keyframeTime, i == hoverIndex);
+            drawKeyframeMark(graphics, x, keyframeTime, false, keyframeMotion(i, partialTick),
+                keyframeProximity(x, playheadX));
         }
     }
 
     /**
-     * One 2px-wide mark hanging down from the bar - {@code KEYFRAME_HEIGHT_IDLE} tall normally,
-     * {@code KEYFRAME_HEIGHT_HOVER} when hovered, in which case a second bar and a {@code <}/{@code >}
-     * glyph appear below it showing whether seeking there means going back or forward.
+     * A mark now grows continuously rather than snapping between two sizes. Real hover extends one
+     * uninterrupted active strip from the timeline down to its full height, then reveals a tiny
+     * code-drawn direction chevron.
      */
-    private void drawKeyframeMark(GuiGraphics graphics, int x, int keyframeTime, boolean hovered) {
-        int alpha = hovered ? scene().getColors().keyframeAlphaHover() : scene().getColors().keyframeAlphaIdle();
-        int markHeight = hovered ? KEYFRAME_HEIGHT_HOVER : KEYFRAME_HEIGHT_IDLE;
+    private void drawKeyframeMark(GuiGraphics graphics, int x, int keyframeTime, boolean pseudo,
+                                  float hoverMotion, float proximity) {
+        float activity = Math.max(hoverMotion, proximity * .25F);
+        int hoverAlpha = scene().getColors().keyframeAlphaHover();
+        int idleAlpha = scene().getColors().keyframeAlphaIdle();
+        int alpha = pseudo
+            ? Math.round(hoverAlpha * hoverMotion)
+            : Math.round(Mth.lerp(activity, idleAlpha, hoverAlpha));
         int color = (alpha << 24) | scene().getColors().keyframeTint();
 
-        graphics.fill(x, 0, x + 2, 1 + markHeight, MARK_Z, color);
+        // Idle remains y=0..5. Hover moves only the lower edge, producing one continuous strip
+        // that wipes from the timeline to y=17 instead of two pieces meeting in the middle.
+        graphics.fill(x, 0, x + 2, keyframeActiveBottom(hoverMotion), MARK_Z, color);
 
-        if (!hovered) {
+        float chevronMotion = keyframeChevronMotion(hoverMotion);
+        if (chevronMotion <= 1 / 512F) {
             return;
         }
-        graphics.fill(x, 9, x + 2, 9 + markHeight, MARK_Z, color);
+
+        int detailAlpha = Math.round(hoverAlpha * chevronMotion);
+        int detailColor = (detailAlpha << 24) | scene().getColors().keyframeTint();
+
         boolean forward = scene().getCurrentTime() < keyframeTime;
-        String glyph = forward ? ">" : "<";
-        int glyphX = forward ? x - 2 - font.width(glyph) : x + 4;
-        // drawString has no z parameter, so the glyph gets there by translating the pose instead.
-        PoseStack poseStack = graphics.pose();
-        poseStack.pushPose();
-        poseStack.translate(0, 0, MARK_Z);
-        graphics.drawString(font, Component.literal(glyph).withStyle(ChatFormatting.BOLD), glyphX, 10, color, false);
-        poseStack.popPose();
+        int travel = Math.round(2F * chevronMotion);
+        int glyphX = forward ? x - 7 - travel : x + 4 + travel;
+        drawKeyframeChevron(graphics, glyphX, KEYFRAME_HEIGHT_HOVER + 2, forward, detailColor);
+    }
+
+    static int keyframeActiveBottom(float hoverMotion) {
+        float clamped = Mth.clamp(hoverMotion, 0F, 1F);
+        int idleBottom = KEYFRAME_HEIGHT_IDLE + 1;
+        int activeBottom = KEYFRAME_HEIGHT_HOVER * 2 + 1;
+        return Math.round(Mth.lerp(clamped, idleBottom, activeBottom));
+    }
+
+    static float keyframeChevronMotion(float hoverMotion) {
+        float delayed = Mth.clamp((hoverMotion - .5F) * 2F, 0F, 1F);
+        return delayed * delayed * (3F - 2F * delayed);
+    }
+
+    private void drawKeyframeChevron(GuiGraphics graphics, int x, int y, boolean right, int color) {
+        for (int row = 0; row < 5; row++) {
+            int column = 2 - Math.abs(2 - row);
+            int pixelX = right ? x + column : x + 2 - column;
+            graphics.fill(pixelX, y + row, pixelX + 1, y + row + 1, MARK_Z, color);
+        }
     }
 
     @Override
@@ -833,6 +1079,9 @@ public class PonderUI extends Screen {
             nextUpWarmup = 0;
             nextUpPrevious = 0F;
             nextUpValue = 0F;
+            if (rightButton != null) {
+                rightButton.resetAttention();
+            }
         }
         scene().seekToTime(time);
     }
@@ -871,7 +1120,7 @@ public class PonderUI extends Screen {
         int barY = timelineY();
         int barWidth = timelineWidth();
         // Deliberately generous hitbox - it reaches 4px past the right end and a full 20px BELOW the
-        // bar, so the hovered keyframe's mark and its </> glyph (drawn down there) stay grabbable
+        // bar, so the hovered keyframe's mark and direction chevron stay grabbable
         // instead of the cursor falling off the widget the moment it leaves the 1px bar.
         return mouseX >= barX && mouseX < barX + barWidth + 4 && mouseY >= barY - 3 && mouseY < barY + 21;
     }
@@ -1318,6 +1567,6 @@ public class PonderUI extends Screen {
 
     @Override
     public boolean isPauseScreen() {
-        return false;
+        return true;
     }
 }

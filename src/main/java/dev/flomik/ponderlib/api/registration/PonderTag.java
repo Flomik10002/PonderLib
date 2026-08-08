@@ -6,6 +6,8 @@ import net.minecraft.world.item.ItemStack;
 
 /** A registered navigation category shown beside scenes and in the Ponder index. */
 public interface PonderTag {
+    ResourceLocation HIGHLIGHT_ALL = ResourceLocation.fromNamespaceAndPath("ponderlib", "_all");
+
     ResourceLocation id();
     Component title();
     Component description();
