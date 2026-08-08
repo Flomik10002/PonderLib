@@ -1,6 +1,8 @@
 package dev.flomik.ponderlib.foundation.ui;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.flomik.ponderlib.api.PonderColorScheme;
+import dev.flomik.ponderlib.api.registration.PonderTag;
 import dev.flomik.ponderlib.render.PonderBoxElement;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -11,6 +13,7 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
@@ -21,8 +24,11 @@ import java.util.function.Supplier;
  * keyboard shortcut whose key name is drawn under the icon — that label is the whole reason
  * identify mode is discoverable at all rather than being a key nobody knows about.
  * <p>
- * Icons are drawn from {@link Icon}'s pixel masks rather than sprite images — plain code, no
- * image files, which keeps this project's "ships no art at all" licensing position intact.
+ * Icons are drawn either from {@link Icon}'s pixel masks (plain code, no image files, which keeps
+ * this project's "ships no art at all" licensing position intact) or, via {@link #showingTag}, as a
+ * real {@link ItemStack} rendered at 1.5x scale — the same frame, hover brighten and click handling,
+ * just what {@code net.createmod.ponder.foundation.ui.PonderButton#showingTag} looks like in the
+ * real Create/Ponder: a tag's own button is this exact widget, not a separate visual.
  */
 public class PonderButton extends AbstractWidget {
 
@@ -111,7 +117,17 @@ public class PonderButton extends AbstractWidget {
     private static final int FRAME_Z = 600;
     private static final int CONTENT_Z = 610;
 
+    // Scale a tag's real item icon is drawn at - Create's own PonderButton#showingTag uses this
+    // exact factor (GuiGameElement.of(item).scale(1.5f)), which is what makes a tag button's icon
+    // read as slightly larger than the plain 16x16 vanilla slot size instead of looking undersized
+    // inside the same 20x20 frame the pixel-mask buttons use.
+    private static final float ITEM_ICON_SCALE = 1.5F;
+    private static final int ITEM_ICON_SIZE = 16;
+
+    @Nullable
     private final Icon icon;
+    @Nullable
+    private final ItemStack itemIcon;
     private final Runnable callback;
     // A supplier, not a fixed value: a button is built once in PonderUI#init, but which scene (and
     // so whose PonderColorScheme) is active can change afterwards (paging, the cross-fade slide).
@@ -124,11 +140,36 @@ public class PonderButton extends AbstractWidget {
     public PonderButton(int x, int y, Icon icon, Component label, Runnable callback, Supplier<PonderColorScheme> colors) {
         super(x, y, SIZE, SIZE, label);
         this.icon = icon;
+        this.itemIcon = null;
         this.callback = callback;
         this.colors = colors;
         // Hand-drawn 8x8 icons can only carry so much meaning - a hover tooltip is what actually
         // makes each button self-describing.
         setTooltip(Tooltip.create(label));
+    }
+
+    private PonderButton(int x, int y, ItemStack itemIcon, Component label, Runnable callback, Supplier<PonderColorScheme> colors) {
+        super(x, y, SIZE, SIZE, label);
+        this.icon = null;
+        this.itemIcon = itemIcon;
+        this.callback = callback;
+        this.colors = colors;
+        setTooltip(Tooltip.create(label));
+    }
+
+    /**
+     * A tag's own button - the exact widget {@code PonderTag} entries render as in real Create:
+     * this frame, this hover brighten, {@code tag.icon()} drawn at 1.5x scale instead of a
+     * pixel-mask {@link Icon}. The tooltip shows the description when the tag has one, the title
+     * otherwise - same fallback {@code PonderTagButton} used before this became a plain
+     * {@code PonderButton}.
+     */
+    public static PonderButton showingTag(int x, int y, PonderTag tag, Runnable callback, Supplier<PonderColorScheme> colors) {
+        PonderButton button = new PonderButton(x, y, tag.icon(), tag.title(), callback, colors);
+        if (!tag.description().getString().isBlank()) {
+            button.setTooltip(Tooltip.create(tag.description()));
+        }
+        return button;
     }
 
     /**
@@ -177,7 +218,13 @@ public class PonderButton extends AbstractWidget {
             .withBounds(SIZE - 6, SIZE - 6)
             .render(graphics);
 
-        drawIcon(graphics, lit ? scheme.buttonIconLit() : scheme.buttonIconDim());
+        if (icon != null) {
+            drawIcon(graphics, lit ? scheme.buttonIconLit() : scheme.buttonIconDim());
+        } else if (itemIcon != null && !itemIcon.isEmpty()) {
+            // A real item's own texture already carries its colour - unlike the pixel masks above,
+            // this is never tinted by buttonIconLit/Dim, only the frame around it brightens on hover.
+            drawItemIcon(graphics);
+        }
 
         if (shortcut != null && fade > 0.1F) {
             // The key name is drawn under the icon, faded in with the button. drawString has no z
@@ -205,6 +252,22 @@ public class PonderButton extends AbstractWidget {
                 }
             }
         }
+    }
+
+    /**
+     * {@code itemIcon} at {@link #ITEM_ICON_SCALE}, centred in the button - vanilla's
+     * {@code renderItem} always draws a fixed 16x16, so centring after scaling (rather than trying
+     * to reproduce Create's own hardcoded {@code at(-4, -4)} offset, tuned for its own item-element
+     * wrapper) is what keeps this centred regardless of {@link #SIZE} or the scale factor.
+     */
+    private void drawItemIcon(GuiGraphics graphics) {
+        PoseStack poseStack = graphics.pose();
+        poseStack.pushPose();
+        float offset = (SIZE - ITEM_ICON_SIZE * ITEM_ICON_SCALE) / 2F;
+        poseStack.translate(getX() + offset, getY() + offset, CONTENT_Z);
+        poseStack.scale(ITEM_ICON_SCALE, ITEM_ICON_SCALE, 1F);
+        graphics.renderItem(itemIcon, 0, 0);
+        poseStack.popPose();
     }
 
     private static int lerpColor(int from, int to, float t) {

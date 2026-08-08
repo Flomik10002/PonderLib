@@ -296,9 +296,12 @@ public class PonderUI extends Screen {
         if (component != null) {
             int tagY = 28;
             for (PonderTag tag : PonderIndex.getTags().getTags(component)) {
-                addRenderableWidget(new PonderTagButton(4, tagY, tag,
-                    () -> minecraft.setScreen(new PonderTagScreen(tag, this))));
-                tagY += 34;
+                // The exact same widget the rest of this row is built from (see PonderButton's own
+                // javadoc) - a tag's button is not a separate visual, just PonderButton#showingTag,
+                // matching real Create's PonderUI#tagButtons one-for-one.
+                addRenderableWidget(PonderButton.showingTag(4, tagY, tag,
+                    () -> minecraft.setScreen(new PonderTagScreen(tag, this)), this::activeColors));
+                tagY += PonderButton.SIZE + spacing;
             }
         }
 
