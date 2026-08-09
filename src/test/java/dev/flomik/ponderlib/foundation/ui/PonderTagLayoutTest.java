@@ -50,10 +50,8 @@ class PonderTagLayoutTest {
     }
 
     @Test
-    void verticalAnchorsDoNotMergeHeaderAndItemGrid() {
+    void categoryContentUsesItsOwnVerticalAnchorsWithoutASceneHeader() {
         assertEquals(121, PonderTagScreen.itemsY(240));
-        assertEquals(-4D, PonderTagScreen.headerOriginY(240));
-        assertEquals(40, PonderTagScreen.headerOriginX(320));
         assertEquals(144, PonderTagScreen.descriptionWidth(320));
         assertEquals(159, PonderTagScreen.descriptionY(240, 28));
         assertEquals(175, PonderTagScreen.descriptionY(240, 64));

@@ -11,6 +11,9 @@ authors = "${mod_authors}" #optional
 description = '''${mod_description}''' #mandatory
 logoFile = "icon.png" #optional
 
+[[mixins]]
+config = "ponderlib.mixins.json"
+
 [[dependencies."${mod_id}"]]
 modId = "neoforge"
 type = "required"
