@@ -18,6 +18,27 @@ scene.overlay().showControls(target, Pointing.DOWN, 40).drop();
 
 The window renders `Drop [Q]` by default and follows the player's current key binding.
 
+## Scripted entity movement
+
+Entities can follow a deterministic eased path without a per-tick `modifyEntity` loop:
+
+```java
+scene.world().moveEntity(
+    diamond,
+    poolInside,
+    24,
+    Easing.QUAD_IN,
+    CollisionMode.IGNORE
+);
+scene.idle(24);
+```
+
+`CollisionMode.IGNORE` drives the position directly, allowing an item to enter a container even
+when ordinary entity collision would stop a throw. `CollisionMode.RESPECT` routes every step
+through vanilla collision instead and therefore may stop short of the requested target. Movement
+is non-blocking, like section animation; its duration is included in the scene timeline, while the
+single `idle` above is only needed when following storyboard actions must wait for arrival.
+
 ## Navigation tags
 
 ```java

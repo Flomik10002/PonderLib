@@ -15,8 +15,9 @@ import java.util.List;
 
 /**
  * Three inner classes, one per {@link SceneBuildingUtil} builder group. Every one of {@link
- * SelectionUtil}'s cuboid-shaped selections is built from the one {@link #cuboid} primitive - see
- * that method's javadoc for the exact formulas.
+ * SelectionUtil}'s cuboid-shaped selections is built from the one {@link
+ * SelectionUtil#cuboid(BlockPos, Vec3i)} primitive - see that method's javadoc for the exact
+ * formulas.
  */
 public class SimpleSceneBuildingUtil implements SceneBuildingUtil {
 

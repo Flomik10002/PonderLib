@@ -15,6 +15,8 @@ import dev.flomik.ponderlib.foundation.instruction.MarkAsFinishedInstruction;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 import dev.flomik.ponderlib.foundation.instruction.TextInstruction;
 import dev.flomik.ponderlib.api.scene.Selection;
+import dev.flomik.ponderlib.api.scene.CollisionMode;
+import dev.flomik.ponderlib.api.scene.Easing;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.RegistryAccess;
@@ -318,6 +320,20 @@ class PonderSceneBuilderTest {
 
         assertEquals(1, schedule.size());
         assertTrue(link.getId() != null);
+    }
+
+    @Test
+    void moveEntityQueuesOneNonBlockingDurationAwareInstruction() {
+        ElementLink<EntityElement> link = new SimpleElementLink<>(EntityElement.class);
+
+        builder.world().moveEntity(link, new Vec3(1, 2, 3), 24, Easing.QUAD_IN, CollisionMode.IGNORE);
+
+        assertEquals(1, schedule.size());
+        PonderInstruction instruction = schedule.get(0);
+        assertInstanceOf(dev.flomik.ponderlib.foundation.instruction.MoveEntityInstruction.class, instruction);
+        assertFalse(instruction.isBlocking());
+        instruction.onScheduled(scene);
+        verify(scene).scheduleDuration(24, false);
     }
 
     @Test

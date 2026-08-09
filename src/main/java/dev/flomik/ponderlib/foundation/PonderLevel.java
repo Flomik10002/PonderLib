@@ -25,6 +25,7 @@ import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
@@ -279,6 +280,15 @@ public class PonderLevel extends Level {
     @Override
     public ChunkSource getChunkSource() {
         return real.getChunkSource();
+    }
+
+    /**
+     * Collision queries must see the schematic's own block map, never whichever chunks happen to
+     * exist at the same coordinates in the real level backing this lightweight scene.
+     */
+    @Override
+    public BlockGetter getChunkForCollisions(int chunkX, int chunkZ) {
+        return this;
     }
 
     @Override

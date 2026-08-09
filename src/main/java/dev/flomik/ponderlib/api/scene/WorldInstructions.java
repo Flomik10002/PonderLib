@@ -192,6 +192,26 @@ public interface WorldInstructions {
     void modifyEntity(ElementLink<EntityElement> link, Consumer<Entity> entityCallback);
 
     /**
+     * Moves the entity {@code link} points to toward an absolute scene-space position over the
+     * requested number of ticks. The movement is a single non-blocking instruction: use
+     * {@link SceneBuilder#idle(int)} when subsequent storyboard actions must wait for it. Rendering
+     * retains the entity renderer's normal partial-tick interpolation between movement samples.
+     * <p>
+     * Position is evaluated from the start captured on the instruction's first tick, rather than
+     * by repeatedly adding per-tick deltas, so easing never accumulates drift. The entity's
+     * gravity, physics flag and velocity are restored when the movement finishes. A non-positive
+     * {@code duration} is treated as one tick.
+     *
+     * @param link          entity returned by {@link #createEntity} or {@link #createItemEntity}
+     * @param target        absolute destination in scene (block) space
+     * @param duration      movement duration in ticks; values below one are clamped to one
+     * @param easing        normalized progress curve
+     * @param collisionMode whether block collision can constrain the movement
+     */
+    void moveEntity(ElementLink<EntityElement> link, Vec3 target, int duration, Easing easing,
+                    CollisionMode collisionMode);
+
+    /**
      * Runs {@code entityCallback} against every entity of type {@code entityClass} currently in this
      * scene, no matter how it got there (created here, or already present some other way).
      */
