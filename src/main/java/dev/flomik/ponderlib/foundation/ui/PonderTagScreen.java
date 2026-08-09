@@ -25,9 +25,9 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * Create's tag-detail screen, kept separate from the scene sidebar. Geometry and layout constants
- * mirror Ponder's {@code PonderTagScreen} and Catnip's centered horizontal layout; all colours are
- * still supplied by PonderLib's owning {@link PonderColorScheme}.
+ * Create-inspired tag-detail screen, kept separate from the scene sidebar. Its category header is
+ * intentionally omitted; the associated-entry grid still mirrors Catnip's centered horizontal
+ * layout, and all colours come from PonderLib's owning {@link PonderColorScheme}.
  */
 public final class PonderTagScreen extends Screen {
 
@@ -46,7 +46,6 @@ public final class PonderTagScreen extends Screen {
     private static final int BACKTRACK_BOTTOM = 31;
     private static final float BACK_ECHO_CHASE = .075F;
 
-    private static final Component PONDERING_TAG = Component.translatable("ponderlib.ui.pondering_tag");
     private static final Component ASSOCIATED = Component.translatable("ponderlib.ui.associated");
     private static final Component THINK_BACK = Component.translatable("ponderlib.ui.think_back");
 
@@ -193,7 +192,6 @@ public final class PonderTagScreen extends Screen {
         renderBackTrackEcho(graphics, partialTick);
         renderBackTrackLabel(graphics);
         renderAssociatedEntries(graphics);
-        renderHeader(graphics);
         renderDescription(graphics);
     }
 
@@ -237,33 +235,6 @@ public final class PonderTagScreen extends Screen {
         int streakBreadth = itemLayout.totalHeight() + 10;
         PonderStreak.render(graphics, 0, 0, 0, streakBreadth, streakLength, colors.buttonBackground());
         PonderStreak.render(graphics, 180, 0, 0, streakBreadth, streakLength, colors.buttonBackground());
-        poseStack.popPose();
-    }
-
-    private void renderHeader(GuiGraphics graphics) {
-        PoseStack poseStack = graphics.pose();
-        poseStack.pushPose();
-        poseStack.translate(headerOriginX(width), headerOriginY(height), 0);
-
-        PonderStreak.render(graphics, 0, 55, 36, 35, 240, colors.buttonBackground());
-        new PonderBoxElement()
-            .withBackground(colors.buttonBackground())
-            .gradientBorder(colors.frameBorderTop(), colors.frameBorderBottom())
-            .at(21, 21, 100)
-            .withBounds(30, 30)
-            .render(graphics);
-
-        graphics.drawString(font, PONDERING_TAG, 59, 25, colors.buttonIconDim(), false);
-        poseStack.pushPose();
-        poseStack.translate(59, 39, 5);
-        graphics.drawString(font, tag.title(), 0, 0, colors.buttonIconLit(), false);
-        poseStack.popPose();
-
-        poseStack.pushPose();
-        poseStack.translate(23, 23, 10);
-        poseStack.scale(1.66F, 1.66F, 1.66F);
-        PonderButton.renderTagIcon(graphics, tag.icon());
-        poseStack.popPose();
         poseStack.popPose();
     }
 
@@ -391,14 +362,6 @@ public final class PonderTagScreen extends Screen {
 
     static int itemsY(int screenHeight) {
         return (int) (MAIN_Y_MULTIPLIER * screenHeight + ITEMS_Y_OFFSET);
-    }
-
-    static int headerOriginX(int screenWidth) {
-        return screenWidth / 2 - 120;
-    }
-
-    static double headerOriginY(int screenHeight) {
-        return screenHeight * MAIN_Y_MULTIPLIER - 40;
     }
 
     static int descriptionWidth(int screenWidth) {

@@ -22,7 +22,8 @@ public class PonderLangProvider extends LanguageProvider {
         add("key.categories.ponderlib", "PonderLib");
         add("key.ponderlib.ponder", "Ponder");
         add("key.ponderlib.index", "Open Ponder Index");
-        add("ponderlib.ui.pondering_tag", "Pondering about...");
+        add("ponderlib.tooltip.hold_to_ponder", "Hold [%1$s] to Ponder");
+        add("ponderlib.ui.pondering", "Pondering about...");
         add("ponderlib.ui.associated", "Associated Entries");
         add("ponderlib.ui.think_back", "Think Back");
     }

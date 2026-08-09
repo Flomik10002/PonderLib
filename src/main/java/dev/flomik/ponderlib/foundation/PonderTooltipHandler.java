@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -33,6 +34,7 @@ import java.util.Optional;
 public final class PonderTooltipHandler {
 
     private static final int PROGRESS_BAR_LENGTH = 40;
+    private static final String HOLD_TO_PONDER_TRANSLATION_KEY = "ponderlib.tooltip.hold_to_ponder";
 
     private static float holdKeyProgress;
     private static ItemStack trackingStack = ItemStack.EMPTY;
@@ -208,10 +210,7 @@ public final class PonderTooltipHandler {
     }
 
     private static Component progressLine(float progress, KeyMapping ponderKey) {
-        Component holdMessage = Component.literal("Hold ")
-            .append(ponderKey.getTranslatedKeyMessage().copy().withStyle(ChatFormatting.GRAY))
-            .append(" to Ponder")
-            .withStyle(ChatFormatting.DARK_GRAY);
+        Component holdMessage = holdMessage(ponderKey.getTranslatedKeyMessage().getString());
 
         if (progress <= 0) {
             return holdMessage;
@@ -226,5 +225,17 @@ public final class PonderTooltipHandler {
         String bars = ChatFormatting.GRAY + Strings.repeat("|", current)
             + ChatFormatting.DARK_GRAY + Strings.repeat("|", total - current);
         return Component.literal(bars);
+    }
+
+    /**
+     * Builds the fully-localised hold hint while keeping the key argument independently styled.
+     * The translation owns the brackets and the placeholder position, so languages are free to
+     * reorder the sentence; only the lower-case key name is white.
+     */
+    static Component holdMessage(String translatedKeyName) {
+        Component key = Component.literal(translatedKeyName.toLowerCase(Locale.ROOT))
+            .withStyle(ChatFormatting.WHITE);
+        return Component.translatable(HOLD_TO_PONDER_TRANSLATION_KEY, key)
+            .withStyle(ChatFormatting.DARK_GRAY);
     }
 }

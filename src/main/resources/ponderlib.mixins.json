@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.flomik.ponderlib.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "ponderlib.refmap.json",
+  "client": [
+    "client.ArmorStandRendererMixin",
+    "client.EntityRendererMixin",
+    "client.LivingEntityRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

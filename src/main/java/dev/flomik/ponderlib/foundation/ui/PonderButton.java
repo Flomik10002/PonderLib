@@ -625,7 +625,7 @@ public class PonderButton extends AbstractWidget {
     }
 
     /** GuiGameElement's GUI item path: null model context, z=100 and full-bright buffers. */
-    private static void renderCreateItem(GuiGraphics graphics, ItemStack stack, float alpha) {
+    static void renderCreateItem(GuiGraphics graphics, ItemStack stack, float alpha) {
         Minecraft minecraft = Minecraft.getInstance();
         ItemRenderer renderer = minecraft.getItemRenderer();
         BakedModel model = renderer.getModel(stack, null, null, 0);

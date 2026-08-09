@@ -3,6 +3,7 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version "${forgegradle_version}"
+    id 'org.spongepowered.mixin' version "${mixingradle_version}"
 }
 
 group = mod_group_id
@@ -17,6 +18,14 @@ base {
 
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+// Wires the SpongePowered Mixin annotation processor into compileJava (refmap generation + SRG
+// remapping args) and injects the resulting MixinConfigs manifest attribute into the built jar -
+// both automatically, from just this one config call. See ponderlib.mixins.json.
+mixin {
+    add sourceSets.main, 'ponderlib.refmap.json'
+    config 'ponderlib.mixins.json'
 }
 
 sourceSets {
@@ -42,6 +51,10 @@ minecraft {
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
             property 'forge.enabledGameTestNamespaces', mod_id
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+
+            arg '-mixin.config=ponderlib.mixins.json'
 
             mods {
                 "${mod_id}" {
@@ -82,6 +95,13 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // Workaround for https://github.com/SpongePowered/MixinGradle/issues/23: the AP is otherwise
+    // picked up by IntelliJ's own "Build using IntelliJ" annotation-processor settings too, which
+    // then fights the Gradle-driven refmap output.
+    if (!Boolean.getBoolean('idea.sync.active')) {
+        annotationProcessor "org.spongepowered:mixin:${mixin_version}:processor"
+    }
 
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -186,4 +206,12 @@ publishing {
 // at all, since a plain POM is all a JAR-via-JitPack consumer needs anyway.
 tasks.withType(GenerateModuleMetadata).configureEach {
     enabled = false
+}
+
+// Workaround for https://github.com/SpongePowered/MixinGradle/issues/38: the reobf task can start
+// running against class files compileJava hasn't finished writing yet without this ordering.
+afterEvaluate {
+    tasks.matching { it.name.startsWith('reobf') }.configureEach {
+        it.mustRunAfter(tasks.compileJava)
+    }
 }

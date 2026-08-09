@@ -41,8 +41,10 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.glfw.GLFW;
 
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 
@@ -117,7 +119,25 @@ public class PonderUI extends Screen {
     private static final Component IDENTIFY_HINT =
         Component.literal("Hover a block to inspect it").withStyle(ChatFormatting.GRAY);
     private static final Component THINK_BACK = Component.translatable("ponderlib.ui.think_back");
+    private static final Component PONDERING = Component.translatable("ponderlib.ui.pondering");
     private static final float BACK_ECHO_CHASE = .075F;
+
+    // Create/Ponder 1.0.91's scene-information plaque. These coordinates are relative to the
+    // plaque origin at (55, 19), not screen-relative proportions: the icon frame consequently lands
+    // at the absolute (21, 21), while the text starts at (59, 25). Keep these package-visible so the
+    // layout tests can pin the upstream dimensions without needing a live Minecraft renderer.
+    static final int SCENE_INFO_ORIGIN_X = 55;
+    static final int SCENE_INFO_ORIGIN_Y = 19;
+    static final int SCENE_INFO_ICON_X = -34;
+    static final int SCENE_INFO_ICON_Y = 2;
+    static final int SCENE_INFO_ICON_SIZE = 30;
+    static final int SCENE_INFO_SUBJECT_X = -35;
+    static final int SCENE_INFO_SUBJECT_Y = 1;
+    static final float SCENE_INFO_SUBJECT_SCALE = 2F;
+    static final int SCENE_INFO_TITLE_MAX_WIDTH = 180;
+    static final int SCENE_INFO_BASE_STREAK_HEIGHT = 35 - 9;
+    static final int SCENE_INFO_BASE_STREAK_WIDTH = 70;
+    static final int SCENE_INFO_TRAILING_STREAK_WIDTH = 30;
 
     // One item can have several registered scenes, and the left/right buttons page between them.
     // `scene` is a view onto the active one so the rest of this class reads unchanged.
@@ -136,6 +156,7 @@ public class PonderUI extends Screen {
     // active scene and whichever neighbour it's still chasing away from, each offset by
     // #slideOffset - see render()/renderScene(int)/renderOverlay(PonderScene).
     private static final float LAZY_INDEX_CHASE_FACTOR = 0.25F;
+    private float lazyIndexPrevious;
     private float lazyIndexValue;
 
     // Slow mode ("comfy reading"): ticks the scene only every (extendedTickLength + 1) ticks, and
@@ -250,6 +271,7 @@ public class PonderUI extends Screen {
         }
         PonderUI ui = new PonderUI(compiled);
         ui.index = start;
+        ui.lazyIndexPrevious = start;
         ui.lazyIndexValue = start;
         return ui;
     }
@@ -668,6 +690,11 @@ public class PonderUI extends Screen {
         if (transitioning && otherIndex != index) {
             renderScene(graphics, partialTick, otherIndex);
         }
+        float renderedLazyIndex = Mth.lerp(partialTick, lazyIndexPrevious, lazyIndexValue);
+        // PonderUI#renderWidgets starts with depth testing off before drawing this plaque. The
+        // subject item's GuiGameElement path turns it back on for its own 3D item render.
+        RenderSystem.disableDepthTest();
+        renderSceneInformation(graphics, screenFade, renderedLazyIndex - index);
         renderOverlay(graphics, partialTick, scene());
         if (transitioning && otherIndex != index) {
             renderOverlay(graphics, partialTick, scenes.get(otherIndex));
@@ -680,6 +707,175 @@ public class PonderUI extends Screen {
         renderTagSidebar(graphics, mouseX, mouseY, partialTick);
         RenderSystem.enableDepthTest();
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    /**
+     * Create's top-left scene plaque: subject icon, the independent {@code "Pondering about..."}
+     * label, and the active storyboard title. The tag browser deliberately has no duplicate header;
+     * this is the only "Pondering about..." plaque. During paging, it keeps Create's expanding
+     * streak and X-axis title flip between the active scene and the frozen neighbour that is
+     * sliding away.
+     */
+    private void renderSceneInformation(GuiGraphics graphics, float fade, float indexDiff) {
+        float absoluteIndexDiff = Math.abs(indexDiff);
+        int otherIndex = sceneInfoOtherIndex(index, scenes.size(), indexDiff);
+        if (otherIndex < 0) {
+            return;
+        }
+
+        String title = scene().getTitle().getString();
+        String otherTitle = scenes.get(otherIndex).getTitle().getString();
+        int titleWidth = Math.min(font.width(title), SCENE_INFO_TITLE_MAX_WIDTH);
+        int otherTitleWidth = Math.min(font.width(otherTitle), SCENE_INFO_TITLE_MAX_WIDTH);
+        int wrappedTitleHeight = font.wordWrapHeight(title, SCENE_INFO_TITLE_MAX_WIDTH);
+        int otherWrappedTitleHeight = font.wordWrapHeight(otherTitle, SCENE_INFO_TITLE_MAX_WIDTH);
+        int streakHeight = sceneInfoStreakHeight(wrappedTitleHeight, otherWrappedTitleHeight,
+            absoluteIndexDiff);
+        int streakWidth = sceneInfoStreakWidth(titleWidth, otherTitleWidth, absoluteIndexDiff);
+        PonderColorScheme colors = activeColors();
+
+        PoseStack poseStack = graphics.pose();
+        poseStack.pushPose();
+        poseStack.translate(0, 0, 400);
+        poseStack.translate(SCENE_INFO_ORIGIN_X, SCENE_INFO_ORIGIN_Y, 0);
+
+        PonderStreak.render(graphics, 0, 0, streakHeight / 2, streakHeight,
+            (int) (streakWidth * fade), colors.buttonBackground());
+        PonderStreak.render(graphics, 180, 0, streakHeight / 2, streakHeight,
+            (int) (SCENE_INFO_TRAILING_STREAK_WIDTH * fade), colors.buttonBackground());
+
+        new PonderBoxElement()
+            .withBackground(colors.buttonBackground())
+            .gradientBorder(colors.frameBorderTop(), colors.frameBorderBottom())
+            .at(SCENE_INFO_ICON_X, SCENE_INFO_ICON_Y, 100)
+            .withBounds(SCENE_INFO_ICON_SIZE, SCENE_INFO_ICON_SIZE)
+            .render(graphics);
+
+        ItemStack subject = subjectStack();
+        if (!subject.isEmpty()) {
+            poseStack.pushPose();
+            poseStack.translate(SCENE_INFO_SUBJECT_X, SCENE_INFO_SUBJECT_Y, 0);
+            poseStack.scale(SCENE_INFO_SUBJECT_SCALE, SCENE_INFO_SUBJECT_SCALE,
+                SCENE_INFO_SUBJECT_SCALE);
+            PonderButton.renderCreateItem(graphics, subject, 1F);
+            poseStack.popPose();
+        }
+
+        poseStack.translate(4, 6, 0);
+        graphics.drawString(font, PONDERING, 0, 0, colors.buttonIconDim(), false);
+        poseStack.translate(0, 14, 0);
+
+        if (scenes.size() == 1 || absoluteIndexDiff < .01F) {
+            drawSceneInfoSplitString(graphics, title, 0, 0, SCENE_INFO_TITLE_MAX_WIDTH,
+                scaleAlphaForText(colors.buttonIconLit(), fade));
+            poseStack.popPose();
+            return;
+        }
+
+        poseStack.translate(0, 6, 0);
+        poseStack.pushPose();
+        poseStack.mulPose(Axis.XN.rotationDegrees(sceneInfoOtherTitleRotation(indexDiff)));
+        poseStack.translate(0, -6, 5);
+        drawSceneInfoSplitString(graphics, otherTitle, 0, 0, SCENE_INFO_TITLE_MAX_WIDTH,
+            scaleAlphaForText(colors.buttonIconLit(), absoluteIndexDiff));
+        poseStack.popPose();
+
+        poseStack.mulPose(Axis.XN.rotationDegrees(sceneInfoActiveTitleRotation(indexDiff)));
+        poseStack.translate(0, -6, 5);
+        drawSceneInfoSplitString(graphics, title, 0, 0, SCENE_INFO_TITLE_MAX_WIDTH,
+            scaleAlphaForText(colors.buttonIconLit(), 1F - absoluteIndexDiff));
+        poseStack.popPose();
+    }
+
+    private ItemStack subjectStack() {
+        ResourceLocation component = scenes.get(0).getComponent();
+        if (component == null || !BuiltInRegistries.ITEM.containsKey(component)) {
+            return ItemStack.EMPTY;
+        }
+        return new ItemStack(BuiltInRegistries.ITEM.get(component));
+    }
+
+    private void drawSceneInfoSplitString(GuiGraphics graphics, String text, int x, int y,
+                                          int width, int color) {
+        for (String line : cutSceneInfoString(text, width)) {
+            int lineX = font.isBidirectional()
+                ? x + width - font.width(font.bidirectionalShaping(line))
+                : x;
+            graphics.drawString(font, line, lineX, y, color, false);
+            y += 9;
+        }
+    }
+
+    // Catnip ClientFontHelper's line-breaking algorithm, used by the original plaque rather than
+    // vanilla Font#split. Keeping it here avoids coupling the scene UI to the tag screen's header.
+    private List<String> cutSceneInfoString(String text, int maxWidthPerLine) {
+        List<String> words = new LinkedList<>();
+        BreakIterator iterator = BreakIterator.getLineInstance(
+            Minecraft.getInstance().getLanguageManager().getJavaLocale());
+        iterator.setText(text);
+        int start = iterator.first();
+        for (int end = iterator.next(); end != BreakIterator.DONE; start = end, end = iterator.next()) {
+            words.add(text.substring(start, end));
+        }
+
+        List<String> lines = new LinkedList<>();
+        StringBuilder currentLine = new StringBuilder();
+        int lineWidth = 0;
+        for (String word : words) {
+            int wordWidth = font.width(word);
+            if (lineWidth + wordWidth > maxWidthPerLine) {
+                if (lineWidth > 0) {
+                    lines.add(currentLine.toString());
+                    currentLine = new StringBuilder();
+                    lineWidth = 0;
+                } else {
+                    lines.add(word);
+                    continue;
+                }
+            }
+            currentLine.append(word);
+            lineWidth += wordWidth;
+        }
+        if (lineWidth > 0) {
+            lines.add(currentLine.toString());
+        }
+        return lines;
+    }
+
+    static int sceneInfoOtherIndex(int index, int sceneCount, float indexDiff) {
+        int otherIndex = index;
+        if (sceneCount != 1 && Math.abs(indexDiff) >= .01F) {
+            otherIndex = index + (int) Math.signum(indexDiff);
+            if (otherIndex < 0 || otherIndex >= sceneCount) {
+                return -1;
+            }
+        }
+        return otherIndex;
+    }
+
+    static int sceneInfoStreakHeight(int titleHeight, int otherTitleHeight, float absoluteIndexDiff) {
+        return SCENE_INFO_BASE_STREAK_HEIGHT
+            + (int) Mth.lerp(absoluteIndexDiff, titleHeight, otherTitleHeight);
+    }
+
+    static int sceneInfoStreakWidth(int titleWidth, int otherTitleWidth, float absoluteIndexDiff) {
+        return SCENE_INFO_BASE_STREAK_WIDTH
+            + (int) Mth.lerp(absoluteIndexDiff, titleWidth, otherTitleWidth);
+    }
+
+    static float sceneInfoOtherTitleRotation(float indexDiff) {
+        return indexDiff * -90F + Math.signum(indexDiff) * 90F;
+    }
+
+    static float sceneInfoActiveTitleRotation(float indexDiff) {
+        return indexDiff * -90F;
+    }
+
+    /** Catnip Color#scaleAlphaForText: Font treats alpha values below five as opaque. */
+    private static int scaleAlphaForText(int argb, float factor) {
+        int alpha = Math.max(0x05,
+            (int) (((argb >>> 24) & 0xFF) * Mth.clamp(factor, 0F, 1F)));
+        return (alpha << 24) | (argb & 0x00FFFFFF);
     }
 
     private void renderBackNavigation(GuiGraphics graphics, float partialTick) {
@@ -886,6 +1082,7 @@ public class PonderUI extends Screen {
      * ({@code 1/4} here).
      */
     private void tickLazyIndex() {
+        lazyIndexPrevious = lazyIndexValue;
         lazyIndexValue = chaseLazyIndex(lazyIndexValue, index);
     }
 

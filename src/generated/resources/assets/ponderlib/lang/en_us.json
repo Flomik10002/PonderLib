@@ -2,7 +2,8 @@
   "key.categories.ponderlib": "PonderLib",
   "key.ponderlib.index": "Open Ponder Index",
   "key.ponderlib.ponder": "Ponder",
+  "ponderlib.tooltip.hold_to_ponder": "Hold [%1$s] to Ponder",
   "ponderlib.ui.associated": "Associated Entries",
-  "ponderlib.ui.pondering_tag": "Pondering about...",
+  "ponderlib.ui.pondering": "Pondering about...",
   "ponderlib.ui.think_back": "Think Back"
 }

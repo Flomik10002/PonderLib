@@ -1,5 +1,6 @@
 {
-  "ponderlib.ui.pondering_tag": "Категория:",
+  "ponderlib.tooltip.hold_to_ponder": "Удерживайте [%1$s] для размышления",
+  "ponderlib.ui.pondering": "Размышляем над...",
   "ponderlib.ui.associated": "Связанные сцены",
   "ponderlib.ui.think_back": "Назад"
 }
