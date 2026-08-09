@@ -29,6 +29,7 @@ import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.alchemy.PotionBrewing;
 import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
@@ -284,6 +285,16 @@ public class PonderLevel extends Level {
     @Override
     public ChunkSource getChunkSource() {
         return real.getChunkSource();
+    }
+
+    /**
+     * Collision queries must read the scene's virtual block map, not the unrelated real-world
+     * chunk source delegated by {@link #getChunkSource()}. This mirrors upstream PonderLevel and is
+     * especially important for collision-aware scripted entity movement.
+     */
+    @Override
+    public BlockGetter getChunkForCollisions(int chunkX, int chunkZ) {
+        return this;
     }
 
     @Override

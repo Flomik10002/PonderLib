@@ -87,6 +87,15 @@ public final class PonderLevelGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    public static void collisionQueriesUseTheVirtualSceneInsteadOfTheRealChunkSource(GameTestHelper helper) {
+        PonderLevel ponder = new PonderLevel(helper.getLevel());
+
+        helper.assertTrue(ponder.getChunkForCollisions(0, 0) == ponder,
+            "Entity collision must query blocks from PonderLevel's virtual block map");
+        helper.succeed();
+    }
+
     // Regression test for a real, user-reported bug: a chest opened via triggerEvent during one
     // playthrough stayed rendered open on a later replay/seekToTime-backward, because
     // getBlockEntity always returns the SAME long-lived instance - replaying the schedule resets

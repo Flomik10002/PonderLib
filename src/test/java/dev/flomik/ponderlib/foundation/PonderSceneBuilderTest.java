@@ -12,9 +12,12 @@ import dev.flomik.ponderlib.foundation.element.OutlineElement;
 import dev.flomik.ponderlib.foundation.element.WorldSectionElementImpl;
 import dev.flomik.ponderlib.foundation.instruction.DelayInstruction;
 import dev.flomik.ponderlib.foundation.instruction.MarkAsFinishedInstruction;
+import dev.flomik.ponderlib.foundation.instruction.MoveEntityInstruction;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 import dev.flomik.ponderlib.foundation.instruction.TextInstruction;
 import dev.flomik.ponderlib.api.scene.Selection;
+import dev.flomik.ponderlib.api.scene.CollisionMode;
+import dev.flomik.ponderlib.api.scene.Easing;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.RegistryAccess;
@@ -363,6 +366,17 @@ class PonderSceneBuilderTest {
         schedule.get(0).tick(scene);
 
         assertTrue(seen.isEmpty(), "a dead/unresolved link must not invoke the callback at all");
+    }
+
+    @Test
+    void moveEntityQueuesOneNativeNonBlockingMovementInstruction() {
+        ElementLink<EntityElement> link = new SimpleElementLink<>(EntityElement.class);
+
+        builder.world().moveEntity(link, new Vec3(2, 3, 4), 24, Easing.QUAD_IN, CollisionMode.IGNORE);
+
+        assertEquals(1, schedule.size());
+        MoveEntityInstruction instruction = assertInstanceOf(MoveEntityInstruction.class, schedule.get(0));
+        assertFalse(instruction.isBlocking());
     }
 
     @Test

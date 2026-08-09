@@ -1,13 +1,15 @@
 package dev.flomik.ponderlib.foundation;
 
+import dev.flomik.ponderlib.api.ParticleEmitter;
+import dev.flomik.ponderlib.api.PonderPalette;
+import dev.flomik.ponderlib.api.Pointing;
 import dev.flomik.ponderlib.api.element.ElementLink;
 import dev.flomik.ponderlib.api.element.EntityElement;
 import dev.flomik.ponderlib.api.element.PonderElement;
 import dev.flomik.ponderlib.api.element.WorldSectionElement;
-import dev.flomik.ponderlib.api.ParticleEmitter;
+import dev.flomik.ponderlib.api.scene.CollisionMode;
+import dev.flomik.ponderlib.api.scene.Easing;
 import dev.flomik.ponderlib.api.scene.EffectInstructions;
-import dev.flomik.ponderlib.api.PonderPalette;
-import dev.flomik.ponderlib.api.Pointing;
 import dev.flomik.ponderlib.api.scene.InputElementBuilder;
 import dev.flomik.ponderlib.api.scene.OverlayInstructions;
 import dev.flomik.ponderlib.api.scene.SceneBuilder;
@@ -32,6 +34,7 @@ import dev.flomik.ponderlib.foundation.instruction.KeyframeInstruction;
 import dev.flomik.ponderlib.foundation.instruction.InputWindowInstruction;
 import dev.flomik.ponderlib.foundation.instruction.LineInstruction;
 import dev.flomik.ponderlib.foundation.instruction.MarkAsFinishedInstruction;
+import dev.flomik.ponderlib.foundation.instruction.MoveEntityInstruction;
 import dev.flomik.ponderlib.foundation.instruction.OutlineInstruction;
 import dev.flomik.ponderlib.foundation.instruction.PonderInstruction;
 import dev.flomik.ponderlib.foundation.instruction.RevealSectionInstruction;
@@ -685,6 +688,12 @@ public class PonderSceneBuilder implements SceneBuilder {
                     element.ifPresent(entityCallback);
                 }
             });
+        }
+
+        @Override
+        public void moveEntity(ElementLink<EntityElement> link, Vec3 target, int duration, Easing easing,
+                               CollisionMode collisionMode) {
+            addInstruction(new MoveEntityInstruction(link, target, duration, easing, collisionMode));
         }
 
         @Override
