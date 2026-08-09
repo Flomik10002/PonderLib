@@ -11,6 +11,7 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,6 +31,13 @@ import java.util.Optional;
  * {@code ConcurrentHashMap}, which rejects null keys). {@link StructureTemplate#placeInWorld}
  * avoids this by reaching into the private {@code palettes} field directly; this does the same via
  * reflection since that field has no public accessor.
+ * <p>
+ * The field is looked up through {@link ObfuscationReflectionHelper} rather than plain
+ * {@code Class#getDeclaredField}: Forge 1.20.1's production runtime still loads a patched,
+ * SRG-named {@code client-*-srg.jar}, and its live official→SRG renaming only rewrites compiled
+ * bytecode field/method references, not string literals passed to reflection — a raw
+ * {@code getDeclaredField("palettes")} finds the field in the Mojmap-named dev environment but
+ * throws {@code NoSuchFieldException} in a real production launch.
  */
 public final class SchematicLoader {
 
@@ -83,11 +91,13 @@ public final class SchematicLoader {
     }
 
     private static Field findPalettesField() {
+        // SRG name for StructureTemplate#palettes as of MC 1.20.1 mappings 20230612.114412 — Forge's
+        // production runtime loads an SRG-named client jar and only remaps compiled bytecode field
+        // references at class-load time, not string literals passed to reflection, so
+        // ObfuscationReflectionHelper needs the SRG id here rather than the Mojmap name.
         try {
-            Field field = StructureTemplate.class.getDeclaredField("palettes");
-            field.setAccessible(true);
-            return field;
-        } catch (ReflectiveOperationException e) {
+            return ObfuscationReflectionHelper.findField(StructureTemplate.class, "f_74482_");
+        } catch (ObfuscationReflectionHelper.UnableToFindFieldException e) {
             throw new IllegalStateException("StructureTemplate#palettes field is missing - vanilla layout changed", e);
         }
     }
