@@ -286,14 +286,14 @@ public class PonderScene {
         for (Iterator<PonderInstruction> iterator = activeSchedule.iterator(); iterator.hasNext(); ) {
             PonderInstruction instruction = iterator.next();
             instruction.tick(this);
+
+            boolean blocking = instruction.isBlocking();
+
             if (instruction.isComplete()) {
                 iterator.remove();
-                // A blocking instruction that completed has consumed its final scheduled tick;
-                // instructions after it belong at this exact timeline position, not one phantom
-                // tick later. Only an INCOMPLETE blocking instruction stops this tick's walk.
-                continue;
             }
-            if (instruction.isBlocking()) {
+
+            if (blocking) {
                 break;
             }
         }

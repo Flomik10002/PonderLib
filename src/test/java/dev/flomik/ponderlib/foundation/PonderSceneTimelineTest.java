@@ -24,14 +24,20 @@ class PonderSceneTimelineTest {
     }
 
     @Test
-    void completedBlockingInstructionDoesNotCreateAPhantomTailTick() {
+    void completedBlockingInstructionStillConsumesTheRestOfItsOwnTick() {
         PonderScene scene = compile((builder, util) -> {
             builder.idle(20);
             builder.addInstruction(ignored -> { });
         });
 
+        // getTotalTime() is a schedule-time estimate (see PonderInstruction#onScheduled) and is
+        // unaffected by this - only the actual tick-by-tick walk in PonderScene#tick() changed.
+        // A blocking instruction that completes on its final tick used to let the next instruction
+        // in the schedule also tick that same call (see idle(n) previously not truly blocking for
+        // n ticks); now the walk always stops once a blocking instruction has been ticked, whether
+        // or not it just finished, so the following instruction starts one real tick later.
         assertEquals(20, scene.getTotalTime());
-        assertEquals(20, scene.measureRuntimeTicks(100));
+        assertEquals(21, scene.measureRuntimeTicks(100));
     }
 
     @Test
