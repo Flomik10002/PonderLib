@@ -40,6 +40,25 @@ class PonderSceneTimelineTest {
         assertEquals(21, scene.measureRuntimeTicks(100));
     }
 
+    /**
+     * Regression guard: pre-fix, each 1-tick idle() completed on its own first tick() call and the
+     * walk in {@link PonderScene#tick()} would continue() straight into the next one within that
+     * same call, collapsing this whole chain into a single real tick instead of four - a shape a
+     * future, well-meaning cleanup could easily reintroduce without this pinned down.
+     */
+    @Test
+    void chainedOneTickDelaysEachConsumeTheirOwnRealTick() {
+        PonderScene scene = compile((builder, util) -> {
+            builder.idle(1);
+            builder.idle(1);
+            builder.idle(1);
+            builder.idle(1);
+        });
+
+        assertEquals(4, scene.getTotalTime());
+        assertEquals(4, scene.measureRuntimeTicks(100));
+    }
+
     @Test
     void seekingCanReachParallelTailPastFinishedMarker() {
         PonderScene scene = compile((builder, util) -> {
