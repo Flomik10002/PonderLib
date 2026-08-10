@@ -278,11 +278,14 @@ public class PonderScene {
         for (Iterator<PonderInstruction> iterator = activeSchedule.iterator(); iterator.hasNext(); ) {
             PonderInstruction instruction = iterator.next();
             instruction.tick(this);
+
+            boolean blocking = instruction.isBlocking();
+
             if (instruction.isComplete()) {
                 iterator.remove();
-                continue;
             }
-            if (instruction.isBlocking()) {
+
+            if (blocking) {
                 break;
             }
         }
