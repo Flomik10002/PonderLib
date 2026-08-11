@@ -11,12 +11,10 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
-import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,19 +27,11 @@ import java.util.Optional;
  * {@link StructureTemplate#filterBlocks} always filters by a specific {@code Block}, and passing
  * {@code null} for "no filter" crashes with an NPE ({@code Palette}'s internal cache is a
  * {@code ConcurrentHashMap}, which rejects null keys). {@link StructureTemplate#placeInWorld}
- * avoids this by reaching into the private {@code palettes} field directly; this does the same via
- * reflection since that field has no public accessor.
- * <p>
- * The field is looked up through {@link ObfuscationReflectionHelper} rather than plain
- * {@code Class#getDeclaredField}: Forge 1.20.1's production runtime still loads a patched,
- * SRG-named {@code client-*-srg.jar}, and its live official→SRG renaming only rewrites compiled
- * bytecode field/method references, not string literals passed to reflection — a raw
- * {@code getDeclaredField("palettes")} finds the field in the Mojmap-named dev environment but
- * throws {@code NoSuchFieldException} in a real production launch.
+ * avoids this by reaching into the private {@code palettes} field directly; {@code
+ * META-INF/accesstransformer.cfg} widens that same field to public here instead of reflection, so
+ * this is a plain field read.
  */
 public final class SchematicLoader {
-
-    private static final Field PALETTES_FIELD = findPalettesField();
 
     private SchematicLoader() {
     }
@@ -76,29 +66,11 @@ public final class SchematicLoader {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static List<StructureTemplate.StructureBlockInfo> blocksOf(StructureTemplate template) {
-        List<StructureTemplate.Palette> palettes;
-        try {
-            palettes = (List<StructureTemplate.Palette>) PALETTES_FIELD.get(template);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Could not read StructureTemplate#palettes", e);
-        }
+        List<StructureTemplate.Palette> palettes = template.palettes;
         if (palettes.isEmpty()) {
             return List.of();
         }
         return new StructurePlaceSettings().getRandomPalette(palettes, BlockPos.ZERO).blocks();
-    }
-
-    private static Field findPalettesField() {
-        // SRG name for StructureTemplate#palettes as of MC 1.20.1 mappings 20230612.114412 — Forge's
-        // production runtime loads an SRG-named client jar and only remaps compiled bytecode field
-        // references at class-load time, not string literals passed to reflection, so
-        // ObfuscationReflectionHelper needs the SRG id here rather than the Mojmap name.
-        try {
-            return ObfuscationReflectionHelper.findField(StructureTemplate.class, "f_74482_");
-        } catch (ObfuscationReflectionHelper.UnableToFindFieldException e) {
-            throw new IllegalStateException("StructureTemplate#palettes field is missing - vanilla layout changed", e);
-        }
     }
 }
