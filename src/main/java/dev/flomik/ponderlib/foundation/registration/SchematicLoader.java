@@ -16,7 +16,6 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,12 +28,11 @@ import java.util.Optional;
  * {@link StructureTemplate#filterBlocks} always filters by a specific {@code Block}, and passing
  * {@code null} for "no filter" crashes with an NPE ({@code Palette}'s internal cache is a
  * {@code ConcurrentHashMap}, which rejects null keys). {@link StructureTemplate#placeInWorld}
- * avoids this by reaching into the private {@code palettes} field directly; this does the same via
- * reflection since that field has no public accessor.
+ * avoids this by reaching into the private {@code palettes} field directly; {@code
+ * META-INF/accesstransformer.cfg} widens that same field so this can do it as a plain field read,
+ * with no reflection and no runtime name lookup.
  */
 public final class SchematicLoader {
-
-    private static final Field PALETTES_FIELD = findPalettesField();
 
     private SchematicLoader() {
     }
@@ -69,27 +67,11 @@ public final class SchematicLoader {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static List<StructureTemplate.StructureBlockInfo> blocksOf(StructureTemplate template) {
-        List<StructureTemplate.Palette> palettes;
-        try {
-            palettes = (List<StructureTemplate.Palette>) PALETTES_FIELD.get(template);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Could not read StructureTemplate#palettes", e);
-        }
+        List<StructureTemplate.Palette> palettes = template.palettes;
         if (palettes.isEmpty()) {
             return List.of();
         }
         return new StructurePlaceSettings().getRandomPalette(palettes, BlockPos.ZERO).blocks();
-    }
-
-    private static Field findPalettesField() {
-        try {
-            Field field = StructureTemplate.class.getDeclaredField("palettes");
-            field.setAccessible(true);
-            return field;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("StructureTemplate#palettes field is missing - vanilla layout changed", e);
-        }
     }
 }

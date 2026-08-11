@@ -32,6 +32,9 @@ configurations {
 
 neoForge {
     version = neo_version
+
+    accessTransformers.from('src/main/resources/META-INF/accesstransformer.cfg')
+
     // `mods { sourceSet(sourceSets.gameTest) }` below only wires gameTest onto the mod's *run*
     // classpath; this is the separate, official call that injects Minecraft/NeoForge onto an
     // additional source set's *compile* classpath (by default only `main` gets it).
