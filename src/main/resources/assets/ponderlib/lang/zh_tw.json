@@ -1,0 +1,9 @@
+{
+  "key.categories.ponderlib": "PonderLib",
+  "key.ponderlib.index": "開啟 Ponder 索引",
+  "key.ponderlib.ponder": "Ponder",
+  "ponderlib.tooltip.hold_to_ponder": "按住 [%1$s] 進行 Ponder",
+  "ponderlib.ui.associated": "相關條目",
+  "ponderlib.ui.pondering": "正在了解……",
+  "ponderlib.ui.think_back": "返回"
+}
